@@ -44,12 +44,18 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
+    Application/Src/app_log.c
+    Application/Src/weather_app.c
+    Drivers/Devices/Src/bh1750.c
+    Drivers/Devices/Src/bme280.c
+    Drivers/Devices/Src/ds3231.c
+    Drivers/Devices/Src/rain_sensor.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
+    Application/Inc
+    Drivers/Devices/Inc
 )
 
 # Add project symbols (macros)

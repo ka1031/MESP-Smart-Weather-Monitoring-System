@@ -45,11 +45,13 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Application/Src/app_log.c
+    Application/Src/temporary_i2c_scanner.c
     Application/Src/weather_app.c
     Drivers/Devices/Src/bh1750.c
     Drivers/Devices/Src/bme280.c
     Drivers/Devices/Src/ds3231.c
     Drivers/Devices/Src/rain_sensor.c
+    Drivers/Devices/Src/ssd1306.c
 )
 
 # Add include paths
@@ -61,6 +63,12 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
+)
+
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
 )
 
 # Remove wrong libob.a library dependency when using cpp files

@@ -30,6 +30,7 @@ typedef struct
   float illuminance_lux;
   uint16_t rain_raw;
   uint8_t rain_percent;
+  uint8_t rain_wet;
   WeatherTimestamp timestamp;
   uint32_t valid_flags;
 } WeatherData;

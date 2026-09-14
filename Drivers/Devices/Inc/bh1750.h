@@ -17,5 +17,6 @@ DeviceStatus BH1750_Init(BH1750_Handle *device,
                          I2C_HandleTypeDef *i2c,
                          uint8_t address_7bit);
 DeviceStatus BH1750_ReadLux(BH1750_Handle *device, float *illuminance_lux);
+const char *BH1750_StatusString(DeviceStatus status);
 
 #endif /* BH1750_H */

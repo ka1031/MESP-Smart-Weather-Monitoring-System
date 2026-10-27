@@ -9,11 +9,12 @@ not currently require an RTOS or an additional application framework.
 - BME280 temperature, humidity, and pressure readings
 - BH1750 ambient-light readings
 - Rain-module analog averaging and active-low digital wet/dry detection
-- SSD1306 128x64 OLED output
+- DS3231 date/time, power-loss detection, and serial clock setting
+- SSD1306 128x64 OLED output with date and time
 - Matching diagnostics through USART1 at 115200 baud
 - PC13 heartbeat toggled after every one-second sample
 
-The DS3231, data logging, networking, and cloud features remain future work.
+Data logging, networking, and cloud features remain future work.
 
 ## Architecture
 
@@ -82,7 +83,7 @@ one startup scan and print responding addresses through USART1.
 
 ## Prototype wiring
 
-- BME280, BH1750, and SSD1306: SCL to PB8 and SDA to PB9
+- BME280, BH1750, SSD1306, and DS3231: SCL to PB8 and SDA to PB9
 - Rain module AO: PA0
 - Rain module DO: PA1
 - All module grounds: common with the STM32 ground
@@ -129,3 +130,56 @@ works independently, create its handle in `weather_app.c`, initialize it from
 `WeatherApp_Init`, and schedule non-blocking or short polling operations from
 `WeatherApp_Run`. Keep device-specific registers and conversion formulas out of
 application code.
+
+## DS3231 clock and serial commands
+
+Connect the DS3231 VCC to 3.3 V, GND to common ground, SCL to PB8, and SDA
+to PB9. SQW/INT and 32K are unused. The existing 100 kHz I2C1 bus and address
+0x68 are used; no internal STM32 RTC or additional I2C pins are required.
+Keep I2C pull-ups at 3.3 V. Set `APP_CONFIG_ENABLE_DS3231` to `0U` to disable
+RTC sampling and its command interface.
+
+Use a **3.3 V logic USB-to-UART adapter**: adapter TX to PA10, adapter RX to
+PA9, and common GND. Open a terminal at **115200 baud, 8 data bits, no parity,
+1 stop bit, no flow control**. Enable local echo if desired. End each command
+with Enter (CR, LF, or CRLF). Wait for a response before sending another command.
+
+```text
+TIME SET 2026-10-24 14:32:05
+TIME?
+HELP
+```
+
+Replace the example with the actual current date/time. Commands are case-sensitive.
+Dates are validated, including leap days, in the range 2000-2099; hours use
+24-hour format. Weekday is calculated automatically. The stored time has no
+time-zone metadata: use local time consistently (e.g. IST) or UTC consistently.
+No build-time date is written automatically, and no internet synchronization is
+performed. The driver reads both 12-hour and 24-hour clocks, and writes 24-hour mode.
+
+Without a battery, the clock must be set again after RTC power is removed.
+Resetting just the STM32 preserves a still-powered RTC. Startup preserves the
+oscillator-stop flag; unset time is reported as `RTC TIME NOT SET` on the OLED
+and `timestamp INVALID` in serial samples. I2C faults display `RTC ERROR`.
+Sensor sampling continues in both cases. Invalid timestamps are zeroed and their
+validity flag is cleared, so consumers must check `WEATHER_DATA_VALID_TIMESTAMP`.
+The date occupies OLED row 0 and time row 5; existing sensor rows are retained.
+Each serial `Sample:` timestamp applies to the following sensor lines and marks
+the start of that sequential sampling cycle, not simultaneous acquisition.
+
+USART1 reception is interrupt-driven and buffered while sensor reads block.
+The application enables its IRQ; the handler is in a preserved USER CODE section.
+Leave CubeMX USART1 NVIC generation disabled to avoid a duplicate handler.
+Overflow or UART errors discard the command: press Enter and resend when prompted.
+Neither I2C operations nor command execution runs in the UART interrupt.
+
+Driver reference: [Analog Devices DS3231 datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf).
+
+### RTC verification
+
+Run host tests with `sh tests/run_rtc_tests.sh`. They use a fake HAL/register map
+and do not require the board. Build firmware with the usual CMake presets.
+On hardware: confirm address 0x68 with the optional scanner, set time, check that
+seconds advance, reset the STM32 while keeping the RTC powered, then remove all
+power and confirm unset-time reporting. Also unplug the RTC and confirm sensors
+continue with invalid timestamps. These hardware checks require the physical board.

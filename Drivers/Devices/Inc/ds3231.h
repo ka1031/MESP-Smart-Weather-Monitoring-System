@@ -32,4 +32,10 @@ DeviceStatus DS3231_ReadDateTime(DS3231_Handle *device,
 DeviceStatus DS3231_SetDateTime(DS3231_Handle *device,
                                 const DS3231_DateTime *date_time);
 
+/* Calendar range: 2000-2099; weekday 1=Sunday, ..., 7=Saturday.
+ * Init preserves OSF. Read leaves output unchanged on any failure.
+ * Set clears OSF only after a complete calendar write. */
+uint8_t DS3231_IsValidDateTime(const DS3231_DateTime *date_time);
+const char *DS3231_StatusString(DeviceStatus status);
+
 #endif /* DS3231_H */

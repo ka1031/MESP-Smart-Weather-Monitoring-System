@@ -19,6 +19,7 @@
 #define APP_CONFIG_ENABLE_BME280              (1U)
 #define APP_CONFIG_ENABLE_BH1750              (1U)
 #define APP_CONFIG_ENABLE_RAIN_SENSOR         (1U)
+#define APP_CONFIG_ENABLE_DS3231              (1U)
 #define APP_CONFIG_ENABLE_OLED                (1U)
 
 /* Keep the scanner available, but disabled during normal measurements. */

@@ -4,6 +4,8 @@
 #include "app_log.h"
 #include "bh1750.h"
 #include "bme280.h"
+#include "ds3231.h"
+#include "rtc_console.h"
 #include "rain_sensor.h"
 #include "ssd1306.h"
 
@@ -19,6 +21,9 @@ static BME280_Handle bme280;
 static BH1750_Handle bh1750;
 static RainSensor_Handle rain_sensor;
 static SSD1306_Handle oled;
+static DS3231_Handle rtc;
+static I2C_HandleTypeDef *rtc_bus;
+static DeviceStatus rtc_status = DEVICE_STATUS_NOT_INITIALIZED;
 
 static DeviceStatus bme280_status = DEVICE_STATUS_NOT_INITIALIZED;
 static DeviceStatus bh1750_status = DEVICE_STATUS_NOT_INITIALIZED;
@@ -44,6 +49,36 @@ static void WeatherApp_LogStatus(const char *device_name,
                  device_name,
                  operation,
                  status_text);
+  (void)AppLog_Write(message);
+}
+
+/* The timestamp describes the start of each sequential sensor sampling cycle. */
+static void WeatherApp_ReadRtc(void)
+{
+  DS3231_DateTime dt;
+  char message[80];
+  latest_weather_data.valid_flags &= ~WEATHER_DATA_VALID_TIMESTAMP;
+  latest_weather_data.timestamp = (WeatherTimestamp){0};
+  if (APP_CONFIG_ENABLE_DS3231 == 0U) return;
+  if (rtc.initialized == 0U)
+    rtc_status = DS3231_Init(&rtc, rtc_bus, APP_CONFIG_DS3231_ADDRESS);
+  if (rtc.initialized != 0U)
+    rtc_status = DS3231_ReadDateTime(&rtc, &dt);
+  if (rtc_status == DEVICE_STATUS_OK)
+  {
+    latest_weather_data.timestamp = (WeatherTimestamp){
+      .year = dt.year, .month = dt.month, .day = dt.day,
+      .hour = dt.hour, .minute = dt.minute, .second = dt.second
+    };
+    latest_weather_data.valid_flags |= WEATHER_DATA_VALID_TIMESTAMP;
+    (void)snprintf(message, sizeof(message),
+        "Sample: %04u-%02u-%02u %02u:%02u:%02u\r\n",
+        (unsigned int)dt.year, (unsigned int)dt.month, (unsigned int)dt.day,
+        (unsigned int)dt.hour, (unsigned int)dt.minute, (unsigned int)dt.second);
+  }
+  else
+    (void)snprintf(message, sizeof(message), "Sample: timestamp INVALID (%s)\r\n",
+                   DS3231_StatusString(rtc_status));
   (void)AppLog_Write(message);
 }
 
@@ -204,6 +239,22 @@ static void WeatherApp_UpdateDisplay(void)
 
   SSD1306_Clear(&oled);
   WeatherApp_WriteDisplayLine(0U, "WEATHER STATION");
+  if (APP_CONFIG_ENABLE_DS3231 != 0U)
+  {
+    if ((latest_weather_data.valid_flags & WEATHER_DATA_VALID_TIMESTAMP) != 0U)
+    {
+      const WeatherTimestamp *dt = &latest_weather_data.timestamp;
+      (void)snprintf(line, sizeof(line), "DATE %04u-%02u-%02u",
+          (unsigned int)dt->year, (unsigned int)dt->month, (unsigned int)dt->day);
+      WeatherApp_WriteDisplayLine(0U, line);
+      (void)snprintf(line, sizeof(line), "TIME %02u:%02u:%02u",
+          (unsigned int)dt->hour, (unsigned int)dt->minute, (unsigned int)dt->second);
+      WeatherApp_WriteDisplayLine(5U, line);
+    }
+    else
+      WeatherApp_WriteDisplayLine(5U,
+          (rtc_status == DEVICE_STATUS_TIME_NOT_SET) ? "RTC TIME NOT SET" : "RTC ERROR");
+  }
 
   if ((latest_weather_data.valid_flags & WEATHER_DATA_VALID_BME280) != 0U)
   {
@@ -450,12 +501,26 @@ void WeatherApp_Init(I2C_HandleTypeDef *sensor_bus,
     }
   }
 
+  rtc_bus = sensor_bus;
+  if (APP_CONFIG_ENABLE_DS3231 != 0U)
+  {
+    rtc_status = DS3231_Init(&rtc, rtc_bus, APP_CONFIG_DS3231_ADDRESS);
+    if (rtc_status == DEVICE_STATUS_OK)
+      WeatherApp_LogInitializedAddress("DS3231", rtc.address_7bit);
+    else
+      WeatherApp_LogStatus("DS3231", "initialization", DS3231_StatusString(rtc_status));
+    if (RTCConsole_Init(debug_uart, &rtc) != HAL_OK)
+      (void)AppLog_Write("RTC serial command receiver failed to start\r\n");
+    (void)AppLog_Write("RTC commands: TIME? | TIME SET YYYY-MM-DD HH:MM:SS | HELP\r\n");
+  }
   last_sample_tick = HAL_GetTick() - APP_CONFIG_SAMPLE_PERIOD_MS;
 }
 
 void WeatherApp_Run(void)
 {
-  uint32_t current_tick = HAL_GetTick();
+  uint32_t current_tick;
+  RTCConsole_Poll();
+  current_tick = HAL_GetTick();
 
   if ((current_tick - last_sample_tick) < APP_CONFIG_SAMPLE_PERIOD_MS)
   {
@@ -463,6 +528,7 @@ void WeatherApp_Run(void)
   }
   last_sample_tick = current_tick;
 
+  WeatherApp_ReadRtc();
   WeatherApp_ReadBme280();
   WeatherApp_ReadBh1750();
   WeatherApp_ReadRainSensor();

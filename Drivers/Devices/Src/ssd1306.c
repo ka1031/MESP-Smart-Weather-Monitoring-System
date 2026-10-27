@@ -61,8 +61,13 @@ static DeviceStatus SSD1306_WriteCommand(SSD1306_Handle *display,
 static const uint8_t *SSD1306_GetGlyph(char character)
 {
   static const uint8_t glyph_dot[5] = {0x00,0x60,0x60,0x00,0x00};
+  static const uint8_t glyph_colon[5] = {0x00,0x36,0x36,0x00,0x00};
   static const uint8_t glyph_minus[5] = {0x08,0x08,0x08,0x08,0x08};
 
+  if (character == ':')
+  {
+    return glyph_colon;
+  }
   if (character == '.')
   {
     return glyph_dot;

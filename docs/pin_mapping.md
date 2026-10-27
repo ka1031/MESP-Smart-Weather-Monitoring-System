@@ -11,7 +11,7 @@
 | **PA10** | USART1_RX | USART1 | Universal Synchronous/Asynchronous Receiver Transmitter 1 (Receive) |
 | **PA13** | SYS_JTMS-SWDIO | SYS | Serial Wire Debug Data I/O (SWDIO) |
 | **PA14** | SYS_JTCK-SWCLK | SYS | Serial Wire Debug Clock (SWCLK) |
-| **PB8** | I2C1_SCL | I2C1 | Shared BME280, BH1750, and SSD1306 clock |
-| **PB9** | I2C1_SDA | I2C1 | Shared BME280, BH1750, and SSD1306 data |
+| **PB8** | I2C1_SCL | I2C1 | Shared BME280, BH1750, SSD1306, and DS3231 clock |
+| **PB9** | I2C1_SDA | I2C1 | Shared BME280, BH1750, SSD1306, and DS3231 data |
 | **PD0** | RCC_OSC_IN | RCC | High-speed external clock input |
 | **PD1** | RCC_OSC_OUT | RCC | High-speed external clock output |

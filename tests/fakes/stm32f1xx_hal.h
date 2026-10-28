@@ -5,6 +5,13 @@ typedef enum {HAL_OK, HAL_ERROR, HAL_BUSY, HAL_TIMEOUT} HAL_StatusTypeDef;
 typedef struct {int unused;} I2C_HandleTypeDef;
 typedef struct {int unused;} ADC_HandleTypeDef;
 typedef struct {int unused;} GPIO_TypeDef;
+typedef struct {struct {uint32_t BaudRatePrescaler;} Init; uint32_t ErrorCode;} SPI_HandleTypeDef;
+typedef enum {GPIO_PIN_RESET, GPIO_PIN_SET} GPIO_PinState;
+#define GPIO_PIN_4 16U
+#define SPI_BAUDRATEPRESCALER_256 256U
+HAL_StatusTypeDef HAL_SPI_Init(SPI_HandleTypeDef *);
+HAL_StatusTypeDef HAL_SPI_TransmitReceive(SPI_HandleTypeDef *, uint8_t *, uint8_t *, uint16_t, uint32_t);
+void HAL_GPIO_WritePin(GPIO_TypeDef *, uint16_t, GPIO_PinState);
 typedef struct {void *Instance; uint32_t ErrorCode;} UART_HandleTypeDef;
 #define USART1 ((void *)1)
 #define USART1_IRQn 37

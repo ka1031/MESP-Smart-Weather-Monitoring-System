@@ -12,6 +12,7 @@ not currently require an RTOS or an additional application framework.
 - DS3231 date/time, power-loss detection, and serial clock setting
 - SSD1306 128x64 OLED output with date and time
 - Matching diagnostics through USART1 at 115200 baud
+- SD CSV logging every five seconds, with RTC timestamps and safe stop/start commands
 - PC13 heartbeat toggled after every one-second sample
 
 Data logging, networking, and cloud features remain future work.
@@ -70,6 +71,13 @@ sensor readings.
 - USART1 at 115200 baud on PA9/PA10
 - USART2 at 115200 baud on PA2/PA3
 - SWD on PA13/PA14
+- SPI1 SD card: PA4 CS, PA5 SCK, PA6 MISO, PA7 MOSI; mode 0 at 281.25 kHz
+
+SD logging creates a new numbered CSV file at boot and saves a row every five
+seconds. The OLED shows `SD LOG <rows>`; USART1 supports `SD?`, `SD START`, and
+`SD STOP`. Stop and wait for the clean-close confirmation before removal.
+See [SD logging instructions](docs/sd_logging.md). The [read-only diagnostic](docs/sd_diagnostic.md)
+remains available as a separate build-time mode.
 
 Peripheral assignments are controlled by `MESP_WeatherStation.ioc`. External
 I2C devices such as the DS3231 do not require the STM32 internal RTC peripheral.

@@ -16,6 +16,16 @@
 #define APP_CONFIG_UART_TIMEOUT_MS           (100U)
 
 /* Prototype feature selection. */
+#ifndef APP_CONFIG_ENABLE_SD_DIAGNOSTIC
+#define APP_CONFIG_ENABLE_SD_DIAGNOSTIC       (0U)
+#endif
+#ifndef APP_CONFIG_ENABLE_SD_LOGGING
+#define APP_CONFIG_ENABLE_SD_LOGGING          (1U)
+#endif
+#define APP_CONFIG_SD_LOG_PERIOD_MS           (5000U)
+#if APP_CONFIG_ENABLE_SD_LOGGING && APP_CONFIG_ENABLE_SD_DIAGNOSTIC
+#error "Select SD logging or the standalone read-only diagnostic, not both"
+#endif
 #define APP_CONFIG_ENABLE_BME280              (1U)
 #define APP_CONFIG_ENABLE_BH1750              (1U)
 #define APP_CONFIG_ENABLE_RAIN_SENSOR         (1U)

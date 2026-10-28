@@ -1,4 +1,6 @@
 #include "weather_app.h"
+#include "sd_diagnostic.h"
+#include "sd_logger.h"
 
 #include "app_config.h"
 #include "app_log.h"
@@ -320,13 +322,27 @@ static void WeatherApp_UpdateDisplay(void)
                    sizeof(line),
                    "RAIN LEVEL %u PCT",
                    (unsigned int)latest_weather_data.rain_percent);
-    WeatherApp_WriteDisplayLine(7U, line);
+#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U || APP_CONFIG_ENABLE_SD_LOGGING != 0U
+    if (((HAL_GetTick() / 4000U) & 1U) != 0U)
+#endif
+      WeatherApp_WriteDisplayLine(7U, line);
   }
   else
   {
     WeatherApp_WriteDisplayLine(6U, "RAIN SENSOR ERROR");
   }
 
+#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U || APP_CONFIG_ENABLE_SD_LOGGING != 0U
+  if (((HAL_GetTick() / 4000U) & 1U) == 0U)
+  {
+#if APP_CONFIG_ENABLE_SD_LOGGING != 0U
+    SDLogger_DisplayText(line, sizeof(line));
+#else
+    SDDiagnostic_Display(line, sizeof(line));
+#endif
+    WeatherApp_WriteDisplayLine(7U, line);
+  }
+#endif
   update_status = SSD1306_UpdateScreen(&oled);
   oled_status = update_status;
   if (update_status != DEVICE_STATUS_OK)
@@ -509,10 +525,10 @@ void WeatherApp_Init(I2C_HandleTypeDef *sensor_bus,
       WeatherApp_LogInitializedAddress("DS3231", rtc.address_7bit);
     else
       WeatherApp_LogStatus("DS3231", "initialization", DS3231_StatusString(rtc_status));
-    if (RTCConsole_Init(debug_uart, &rtc) != HAL_OK)
-      (void)AppLog_Write("RTC serial command receiver failed to start\r\n");
-    (void)AppLog_Write("RTC commands: TIME? | TIME SET YYYY-MM-DD HH:MM:SS | HELP\r\n");
   }
+  if (RTCConsole_Init(debug_uart, &rtc) != HAL_OK)
+    (void)AppLog_Write("Serial command receiver failed to start\r\n");
+  (void)AppLog_Write("RTC commands: TIME? | TIME SET YYYY-MM-DD HH:MM:SS | HELP\r\n");
   last_sample_tick = HAL_GetTick() - APP_CONFIG_SAMPLE_PERIOD_MS;
 }
 
@@ -520,6 +536,9 @@ void WeatherApp_Run(void)
 {
   uint32_t current_tick;
   RTCConsole_Poll();
+#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U
+  SDDiagnostic_Process();
+#endif
   current_tick = HAL_GetTick();
 
   if ((current_tick - last_sample_tick) < APP_CONFIG_SAMPLE_PERIOD_MS)
@@ -532,6 +551,9 @@ void WeatherApp_Run(void)
   WeatherApp_ReadBme280();
   WeatherApp_ReadBh1750();
   WeatherApp_ReadRainSensor();
+#if APP_CONFIG_ENABLE_SD_LOGGING != 0U
+  SDLogger_Process(&latest_weather_data, current_tick);
+#endif
   WeatherApp_UpdateDisplay();
 
   HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);

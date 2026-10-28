@@ -1,5 +1,10 @@
 **STM32F103C8Tx Pin Configuration (image_101d70.jpg)**
 
+The current CubeMX configuration also reserves PA4 (`SD_CS`, output initially
+high), PA5 (SPI1 SCK), PA6 (SPI1 MISO, pull-up), and PA7 (SPI1 MOSI) for the
+SD card interface. These assignments are saved in the `.ioc` and generated
+by CubeMX. See [SD logging](sd_logging.md) for operation and wiring.
+
 | Pin Name | Signal / Function | Peripheral | Description |
 | --- | --- | --- | --- |
 | **PC13** | GPIO_Output | GPIO | Active-low Blue Pill status LED / heartbeat |

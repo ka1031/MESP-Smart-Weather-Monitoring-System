@@ -1,5 +1,8 @@
 #include "rtc_console.h"
 #include "app_log.h"
+#include "app_config.h"
+#include "sd_diagnostic.h"
+#include "sd_logger.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -50,6 +53,23 @@ static void ExecuteLine(void)
   DS3231_DateTime dt;
   uint16_t year;
   DeviceStatus status;
+#if APP_CONFIG_ENABLE_SD_LOGGING != 0U
+  if (strcmp(line, "SD?") == 0) { SDLogger_Report(); return; }
+  if (strcmp(line, "SD START") == 0) { SDLogger_Start(); return; }
+  if (strcmp(line, "SD STOP") == 0) { SDLogger_Stop(); return; }
+  if (strcmp(line, "SD TEST") == 0) {
+    (void)AppLog_Write("SD logging firmware: use SD? | SD START | SD STOP\r\n");
+    return;
+  }
+#endif
+#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U
+  if (strcmp(line, "SD?") == 0) { SDDiagnostic_Report(); return; }
+  if (strcmp(line, "SD TEST") == 0) {
+    SDDiagnostic_Request();
+    (void)AppLog_Write("SD read-only test requested\r\n");
+    return;
+  }
+#endif
   if (strcmp(line, "TIME?") == 0)
   {
     ReportTime();
@@ -57,6 +77,12 @@ static void ExecuteLine(void)
   }
   if (strcmp(line, "HELP") == 0)
   {
+#if APP_CONFIG_ENABLE_SD_LOGGING != 0U
+    (void)AppLog_Write("SD commands: SD? | SD START | SD STOP (close before removal)\r\n");
+#endif
+#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U
+    (void)AppLog_Write("SD commands: SD? | SD TEST (read-only)\r\n");
+#endif
     (void)AppLog_Write("Commands: TIME? | TIME SET YYYY-MM-DD HH:MM:SS (2000-2099, 24h)\r\n");
     return;
   }

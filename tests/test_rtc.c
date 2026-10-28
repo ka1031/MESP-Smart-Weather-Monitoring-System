@@ -6,6 +6,9 @@
 #include "bh1750.h"
 #include "rain_sensor.h"
 #include "ssd1306.h"
+#include "sd_diagnostic.h"
+#include "sd_logger.h"
+#include "app_config.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,6 +24,20 @@ static unsigned int write_count;
 static uint8_t *receive_target;
 static char output[8192];
 static int stop_during_read;
+static unsigned int sd_requests, sd_reports, sd_processes;
+static unsigned int log_starts, log_stops, log_reports, log_samples;
+void SDLogger_Start(void) { ++log_starts; }
+void SDLogger_Stop(void) { ++log_stops; }
+void SDLogger_Report(void) { ++log_reports; }
+void SDLogger_Process(const WeatherData *data, uint32_t sample_tick)
+{ (void)sample_tick; assert((data->valid_flags & 7U) == 7U); ++log_samples; }
+void SDLogger_DisplayText(char *buffer, size_t size)
+{ (void)snprintf(buffer, size, "SD LOG %u", log_samples); }
+void SDDiagnostic_Request(void) { ++sd_requests; }
+void SDDiagnostic_Report(void) { ++sd_reports; }
+void SDDiagnostic_Process(void) { ++sd_processes; }
+void SDDiagnostic_Display(char *buffer, size_t size)
+{ (void)snprintf(buffer, size, "SD NO R1 C0"); }
 
 HAL_StatusTypeDef HAL_I2C_IsDeviceReady(I2C_HandleTypeDef *h, uint16_t addr,
                                         uint32_t tries, uint32_t timeout)
@@ -157,6 +174,16 @@ static void TestConsole(void)
   unsigned int before;
   Reset(); registers[0x0F] = 0x80;
   assert(RTCConsole_Init(&uart, &rtc) == HAL_OK);
+#if APP_CONFIG_ENABLE_SD_LOGGING != 0U
+  Command("SD START\nSD?\nSD STOP\n");
+  assert(log_starts == 1U && log_reports == 1U && log_stops == 1U && log_samples == 0U);
+  Command("SD TEST\n");
+  assert(sd_requests == 0U);
+#endif
+#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U
+  Command("SD TEST\nSD?\n");
+  assert(sd_requests == 1U && sd_reports == 1U && sd_processes == 0U);
+#endif
   Command("TIME?\r\n"); assert(strstr(output, "RTC time not set"));
   output[0] = '\0';
   /* Entire pasted command arrives while the main loop is busy. */
@@ -234,6 +261,13 @@ static void TestApplication(void)
   assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
   assert(data->timestamp.year == 0 && strstr(output, "timestamp INVALID"));
   assert(strcmp(display_lines[5], "RTC TIME NOT SET") == 0);
+#if APP_CONFIG_ENABLE_SD_LOGGING != 0U
+  assert(strcmp(display_lines[7], "SD LOG 1") == 0 && log_samples == 1U);
+#elif APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U
+  assert(strcmp(display_lines[7], "SD NO R1 C0") == 0 && sd_processes == 1U);
+#else
+  assert(strcmp(display_lines[7], "RAIN LEVEL 25 PCT") == 0 && sd_processes == 0U);
+#endif
   Send("TIME SET 2026-10-24 14:32:05\n");
   WeatherApp_Run(); /* Commands work even before the next sample is due. */
   assert(sensor_reads == 3U && strstr(output, "RTC time set."));
@@ -248,6 +282,7 @@ static void TestApplication(void)
   read_status = HAL_OK; tick += 1000U; WeatherApp_Run();
   assert(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP);
   registers[0x0F] |= 0x80U; tick += 1000U; WeatherApp_Run();
+  assert(strcmp(display_lines[7], "RAIN LEVEL 25 PCT") == 0);
   assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
   ready_status = HAL_ERROR; WeatherApp_Init(&bus, &adc, &uart); WeatherApp_Run();
   assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));

@@ -44,6 +44,12 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    Application/Src/sd_diagnostic.c
+    Application/Src/sd_logger.c
+    Application/Src/sd_diskio.c
+    Application/Src/weather_csv.c
+    Middlewares/Third_Party/FatFs/ff.c
+    Drivers/Devices/Src/sd_probe.c
     Application/Src/rtc_console.c
     Application/Src/app_log.c
     Application/Src/temporary_i2c_scanner.c
@@ -58,6 +64,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Application/Inc
+    Middlewares/Third_Party/FatFs
     Drivers/Devices/Inc
 )
 
@@ -80,4 +87,13 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
+)
+
+# Keep flashable formats in step with the ELF in either build preset.
+add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+        $<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>/${CMAKE_PROJECT_NAME}.bin
+    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+        $<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>/${CMAKE_PROJECT_NAME}.hex
+    VERBATIM
 )

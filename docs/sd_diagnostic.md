@@ -4,7 +4,7 @@ Normal firmware now enables [CSV logging](sd_logging.md). To build the standalon
 diagnostic described below, set `APP_CONFIG_ENABLE_SD_LOGGING` to `0U` and
 `APP_CONFIG_ENABLE_SD_DIAGNOSTIC` to `1U` in `Application/Inc/app_config.h`.
 
-This stage initializes the card and reads sector zero, checking its CRC16.
+The diagnostic initializes the card and reads sector zero, checking its CRC16.
 It does not mount a filesystem, create files, write sectors, erase, or format.
 An `SD READ OK` result verifies initialization and one sector read at the slow
 startup clock; it does not yet verify filesystem compatibility, writes, or a
@@ -33,7 +33,7 @@ there is no second SPI handle or project-owned GPIO initializer.
 3. Power-cycle with the card inserted. The test runs once at boot.
 4. Watch the bottom OLED row: it alternates every four seconds between rain
    percentage and the SD result. Existing measurements continue afterward.
-5. Report the exact SD message. For more detail, use USART1 at 115200 baud,
+5. Check the SD message. For more detail, use USART1 at 115200 baud,
    8 data bits, no parity, one stop bit, and send `SD?` followed by Enter.
    Send `SD TEST` followed by Enter to retry without rebooting.
 
@@ -83,5 +83,5 @@ latched results and manual retry. RTC/application tests run with the diagnostic
 both enabled and disabled and cover command dispatch and OLED alternation.
 
 These checks cannot measure the physical board's supply or SPI waveforms.
-The board has passed this read-only test. Filesystem mounting and CSV logging
-are implemented in the normal logging mode and require a separate write test.
+The board has passed the read-only test and normal CSV logging has been
+confirmed working. This diagnostic is available for troubleshooting.

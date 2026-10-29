@@ -15,6 +15,12 @@
 #define APP_CONFIG_I2C_TIMEOUT_MS            (100U)
 #define APP_CONFIG_UART_TIMEOUT_MS           (100U)
 
+#ifndef APP_CONFIG_ENABLE_ESP32_LINK
+#define APP_CONFIG_ENABLE_ESP32_LINK           (1U)
+#endif
+/* USART2: 115200 8N1. A full 319-byte packet takes under 28 ms on the wire. */
+#define APP_CONFIG_ESP32_UART_TIMEOUT_MS       (50U)
+
 /* Prototype feature selection. */
 #ifndef APP_CONFIG_ENABLE_SD_DIAGNOSTIC
 #define APP_CONFIG_ENABLE_SD_DIAGNOSTIC       (0U)

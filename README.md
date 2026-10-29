@@ -13,9 +13,13 @@ not currently require an RTOS or an additional application framework.
 - SSD1306 128x64 OLED output with date and time
 - Matching diagnostics through USART1 at 115200 baud
 - SD CSV logging every five seconds, with RTC timestamps and safe stop/start commands
+- Versioned, checksummed sensor packets on USART2 for an ESP32 receiver
 - PC13 heartbeat toggled after every one-second sample
 
-Data logging, networking, and cloud features remain future work.
+ESP32 receiver firmware and a local Wi-Fi readings page are provided in `ESP32/`.
+Cloud connectivity and weather classification remain future work.
+Local SD logging and the STM32 UART sender are implemented. Wind sensing has
+been removed from scope; the SSD1306 OLED replaces the proposed 20×4 LCD.
 
 ## Architecture
 
@@ -79,6 +83,13 @@ seconds. The OLED shows `SD LOG <rows>`; USART1 supports `SD?`, `SD START`, and
 See [SD logging instructions](docs/sd_logging.md). The [read-only diagnostic](docs/sd_diagnostic.md)
 remains available as a separate build-time mode.
 
+The STM32 sends a `$MESP,1,...*CRC16` packet over USART2 after each sensor sample,
+normally once per second. Connect PA2 to ESP32 GPIO16 and share ground. PA3 to
+GPIO17 is reserved for future return traffic. USART1 retains its debug console.
+See [STM32–ESP32 protocol](docs/stm32_esp32_protocol.md) for fields, checksum,
+wiring, and receiver requirements. See [ESP32 upload instructions](ESP32/UPLOAD_INSTRUCTIONS.md)
+for the separate ESP32 sketch, wiring and local Wi-Fi page.
+
 Peripheral assignments are controlled by `MESP_WeatherStation.ioc`. External
 I2C devices such as the DS3231 do not require the STM32 internal RTC peripheral.
 
@@ -128,8 +139,9 @@ cmake --preset Release
 cmake --build --preset Release
 ```
 
-Flashing is intentionally not embedded in the build system yet. Use the
-existing ST-Link/OpenOCD or STM32CubeProgrammer workflow for the board.
+Flash the STM32 ELF using ST-Link/OpenOCD or STM32CubeProgrammer.
+Build and upload the ESP32 separately through PlatformIO; see the
+[ESP32 setup guide](ESP32/UPLOAD_INSTRUCTIONS.md).
 
 ## Adding a device implementation
 

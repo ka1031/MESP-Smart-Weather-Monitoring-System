@@ -1,22 +1,27 @@
-**STM32F103C8Tx Pin Configuration (image_101d70.jpg)**
+# Pin assignments
 
 The current CubeMX configuration also reserves PA4 (`SD_CS`, output initially
 high), PA5 (SPI1 SCK), PA6 (SPI1 MISO, pull-up), and PA7 (SPI1 MOSI) for the
 SD card interface. These assignments are saved in the `.ioc` and generated
 by CubeMX. See [SD logging](sd_logging.md) for operation and wiring.
 
-| Pin Name | Signal / Function | Peripheral | Description |
-| --- | --- | --- | --- |
-| **PC13** | GPIO_Output | GPIO | Active-low Blue Pill status LED / heartbeat |
-| **PA0** | ADC1_IN0 | ADC1 | Rain module analog output (AO) |
-| **PA1** | GPIO_Input | GPIO | Rain module digital output (DO), normally active-low |
-| **PA2** | USART2_TX | USART2 | Universal Synchronous/Asynchronous Receiver Transmitter 2 (Transmit) |
-| **PA3** | USART2_RX | USART2 | Universal Synchronous/Asynchronous Receiver Transmitter 2 (Receive) |
-| **PA9** | USART1_TX | USART1 | Universal Synchronous/Asynchronous Receiver Transmitter 1 (Transmit) |
-| **PA10** | USART1_RX | USART1 | Universal Synchronous/Asynchronous Receiver Transmitter 1 (Receive) |
-| **PA13** | SYS_JTMS-SWDIO | SYS | Serial Wire Debug Data I/O (SWDIO) |
-| **PA14** | SYS_JTCK-SWCLK | SYS | Serial Wire Debug Clock (SWCLK) |
-| **PB8** | I2C1_SCL | I2C1 | Shared BME280, BH1750, SSD1306, and DS3231 clock |
-| **PB9** | I2C1_SDA | I2C1 | Shared BME280, BH1750, SSD1306, and DS3231 data |
-| **PD0** | RCC_OSC_IN | RCC | High-speed external clock input |
-| **PD1** | RCC_OSC_OUT | RCC | High-speed external clock output |
+## Sensors and display
+
+- PB8 / PB9: shared I2C1 SCL / SDA for BME280, BH1750, DS3231 and SSD1306.
+- PA0: rain analog input (ADC1 channel 0).
+- PA1: rain digital input, normally active-low.
+
+## Serial interfaces
+
+- PA2: USART2 TX → ESP32 GPIO16.
+- PA3: USART2 RX ← ESP32 GPIO17, reserved return path.
+- PA9 / PA10: USART1 TX / RX for the debug and RTC/SD command console.
+- Both UARTs use 115200 baud, 8N1 and 3.3 V logic.
+
+## Board functions
+
+- PC13: active-low heartbeat LED.
+- PA13 / PA14: SWDIO / SWCLK for programming and debugging.
+- PD0 / PD1: external oscillator input / output.
+
+All modules share ground. Weather-status LEDs and buzzer pins are not assigned yet.

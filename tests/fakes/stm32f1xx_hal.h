@@ -14,6 +14,8 @@ HAL_StatusTypeDef HAL_SPI_TransmitReceive(SPI_HandleTypeDef *, uint8_t *, uint8_
 void HAL_GPIO_WritePin(GPIO_TypeDef *, uint16_t, GPIO_PinState);
 typedef struct {void *Instance; uint32_t ErrorCode;} UART_HandleTypeDef;
 #define USART1 ((void *)1)
+#define USART2 ((void *)4)
+HAL_StatusTypeDef HAL_UART_Transmit(UART_HandleTypeDef *, const uint8_t *, uint16_t, uint32_t);
 #define USART1_IRQn 37
 #define HAL_UART_ERROR_NONE 0U
 #define I2C_MEMADD_SIZE_8BIT 1U

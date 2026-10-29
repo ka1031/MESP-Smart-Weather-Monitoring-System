@@ -109,7 +109,7 @@ int main(void)
   MX_ADC1_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  WeatherApp_Init(&hi2c1, &hadc1, &huart1);
+  WeatherApp_Init(&hi2c1, &hadc1, &huart1, &huart2);
 #if APP_CONFIG_ENABLE_SD_LOGGING != 0U
   SDLogger_Init(&hspi1, SD_CS_GPIO_Port, SD_CS_Pin);
 #endif

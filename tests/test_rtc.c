@@ -16,6 +16,20 @@
 static uint8_t registers[0x13];
 static I2C_HandleTypeDef bus;
 static UART_HandleTypeDef uart = {USART1, 0U};
+static UART_HandleTypeDef esp_uart = {USART2, 0U};
+static unsigned int esp_transmits;
+static HAL_StatusTypeDef esp_tx_result;
+static char esp_packet[320];
+HAL_StatusTypeDef HAL_UART_Transmit(UART_HandleTypeDef *h, const uint8_t *p,
+                                    uint16_t n, uint32_t timeout)
+{
+  assert(h == &esp_uart && n < sizeof(esp_packet));
+  assert(timeout == APP_CONFIG_ESP32_UART_TIMEOUT_MS);
+  memcpy(esp_packet, p, n); esp_packet[n] = '\0';
+  assert(strncmp(esp_packet, "$MESP,1,", 8U) == 0);
+  ++esp_transmits;
+  return esp_tx_result;
+}
 static DS3231_Handle rtc;
 static HAL_StatusTypeDef ready_status;
 static HAL_StatusTypeDef read_status;
@@ -255,8 +269,13 @@ static void TestApplication(void)
   ADC_HandleTypeDef adc;
   const WeatherData *data;
   Reset(); tick = 0; sensor_reads = 0; registers[0x0F] = 0x80;
-  WeatherApp_Init(&bus, &adc, &uart);
+  WeatherApp_Init(&bus, &adc, &uart, &esp_uart);
   WeatherApp_Run(); data = WeatherApp_GetLatestData();
+#if APP_CONFIG_ENABLE_ESP32_LINK != 0U
+  assert(esp_transmits == 1U && strstr(esp_packet, ",0,,0,") != NULL);
+#else
+  assert(esp_transmits == 0U);
+#endif
   assert(sensor_reads == 3U && (data->valid_flags & 7U) == 7U);
   assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
   assert(data->timestamp.year == 0 && strstr(output, "timestamp INVALID"));
@@ -270,9 +289,15 @@ static void TestApplication(void)
 #endif
   Send("TIME SET 2026-10-24 14:32:05\n");
   WeatherApp_Run(); /* Commands work even before the next sample is due. */
+#if APP_CONFIG_ENABLE_ESP32_LINK != 0U
+  assert(esp_transmits == 1U); /* No duplicate send between samples. */
+#endif
   assert(sensor_reads == 3U && strstr(output, "RTC time set."));
   tick += 1000U; WeatherApp_Run();
   assert((data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP) && data->timestamp.year == 2026);
+#if APP_CONFIG_ENABLE_ESP32_LINK != 0U
+  assert(esp_transmits == 2U && strstr(esp_packet, "2026-10-24 14:32:05,1,") != NULL);
+#endif
   assert(strcmp(display_lines[0], "DATE 2026-10-24") == 0);
   assert(strcmp(display_lines[5], "TIME 14:32:05") == 0);
   assert(strstr(display_lines[1], "TEMP") && strstr(display_lines[6], "RAIN"));
@@ -284,13 +309,31 @@ static void TestApplication(void)
   registers[0x0F] |= 0x80U; tick += 1000U; WeatherApp_Run();
   assert(strcmp(display_lines[7], "RAIN LEVEL 25 PCT") == 0);
   assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
-  ready_status = HAL_ERROR; WeatherApp_Init(&bus, &adc, &uart); WeatherApp_Run();
+  ready_status = HAL_ERROR; WeatherApp_Init(&bus, &adc, &uart, &esp_uart); WeatherApp_Run();
   assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
   ready_status = HAL_OK; tick += 1000U; WeatherApp_Run();
   Send("TIME SET 2026-10-24 14:32:05\n");
   tick += 1000U; WeatherApp_Run();
   assert(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP);
   puts("Weather application RTC/display/fault recovery tests passed");
+#if APP_CONFIG_ENABLE_ESP32_LINK != 0U
+  unsigned int before_reads = sensor_reads, before_tx = esp_transmits;
+#if APP_CONFIG_ENABLE_SD_LOGGING != 0U
+  unsigned int before_logs = log_samples;
+#endif
+  esp_tx_result = HAL_TIMEOUT;
+  tick += 1000U; WeatherApp_Run();
+  assert(sensor_reads == before_reads + 3U && esp_transmits == before_tx + 1U);
+  assert(strstr(output, "ESP32 UART transmit failed") != NULL);
+#if APP_CONFIG_ENABLE_SD_LOGGING != 0U
+  assert(log_samples == before_logs + 1U);
+#endif
+  esp_tx_result = HAL_OK;
+  tick += 1000U; WeatherApp_Run();
+  assert(sensor_reads == before_reads + 6U && esp_transmits == before_tx + 2U);
+  assert(strstr(output, "ESP32 UART transmit recovered") != NULL);
+  puts("USART2 sample forwarding and local operation during TX failure passed");
+#endif
 }
 
 int main(void)

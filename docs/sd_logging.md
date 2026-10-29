@@ -10,8 +10,7 @@ second. SD operations are synchronous, so writes or faults can delay a sample.
 
 Build both presets with `cmake --build --preset Debug` and
 `cmake --build --preset Release`. Each build generates matching `.elf`, `.bin`,
-and `.hex` files in its own directory. Flash the updated ELF using the same
-workflow used for the successful diagnostic. Raw BIN files load at `0x08000000`.
+and `.hex` files in its own directory. Flash the ELF using ST-Link or STM32CubeProgrammer. Raw BIN files load at `0x08000000`.
 
 With the card inserted, power-cycle the station. The bottom OLED row alternates
 between rain percentage and `SD LOG 1`, `SD LOG 2`, etc. The count advances only
@@ -80,6 +79,4 @@ Run `sh tests/run_sd_tests.sh`, `sh tests/run_sd_logging_tests.sh`, and
 physical card. They cover SDHC/SDSC protocol, CRCs, errors, FAT16/FAT32 and MBR
 partition layouts, CSV contents, cadence and timer rollover, restart/reboot,
 existing-log preservation, rejected writes, full cards and blank media.
-`fsck.fat -n` checks the resulting filesystems. The read-only hardware test has
-passed on the user's board; physical filesystem writes still need validation
-with this logging firmware.
+`fsck.fat -n` checks the resulting filesystems. SD initialization and CSV logging have been confirmed working on the board.

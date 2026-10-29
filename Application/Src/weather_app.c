@@ -1,4 +1,5 @@
 #include "weather_app.h"
+#include "esp32_link.h"
 #include "sd_diagnostic.h"
 #include "sd_logger.h"
 
@@ -19,6 +20,10 @@
 #include <stdio.h>
 
 static WeatherData latest_weather_data;
+#if APP_CONFIG_ENABLE_ESP32_LINK != 0U
+static ESP32Link_Handle esp32_link;
+static HAL_StatusTypeDef esp32_tx_status;
+#endif
 static BME280_Handle bme280;
 static BH1750_Handle bh1750;
 static RainSensor_Handle rain_sensor;
@@ -436,7 +441,8 @@ static void WeatherApp_ReadRainSensor(void)
 
 void WeatherApp_Init(I2C_HandleTypeDef *sensor_bus,
                      ADC_HandleTypeDef *rain_adc,
-                     UART_HandleTypeDef *debug_uart)
+                     UART_HandleTypeDef *debug_uart,
+                     UART_HandleTypeDef *esp_uart)
 {
   AppLog_Init(debug_uart);
   latest_weather_data = (WeatherData){0};
@@ -448,6 +454,14 @@ void WeatherApp_Init(I2C_HandleTypeDef *sensor_bus,
   }
 
   (void)AppLog_Write("\r\nMESP weather station starting\r\n");
+#if APP_CONFIG_ENABLE_ESP32_LINK != 0U
+  esp32_tx_status = ESP32Link_Init(&esp32_link, esp_uart);
+  (void)AppLog_Write(esp32_tx_status == HAL_OK
+      ? "ESP32 output: USART2 PA2, 115200 8N1, MESP protocol v1\r\n"
+      : "ESP32 output unavailable: invalid USART2 handle\r\n");
+#else
+  (void)esp_uart;
+#endif
 
 #if APP_CONFIG_ENABLE_I2C_SCANNER != 0U
   /* TEMPORARY: enable only while diagnosing the physical I2C1 bus. */
@@ -551,6 +565,14 @@ void WeatherApp_Run(void)
   WeatherApp_ReadBme280();
   WeatherApp_ReadBh1750();
   WeatherApp_ReadRainSensor();
+#if APP_CONFIG_ENABLE_ESP32_LINK != 0U
+  HAL_StatusTypeDef tx_status = ESP32Link_Send(&esp32_link, &latest_weather_data, current_tick);
+  if (tx_status != HAL_OK && esp32_tx_status == HAL_OK)
+    (void)AppLog_Write("ESP32 UART transmit failed; local measurements continue\r\n");
+  else if (tx_status == HAL_OK && esp32_tx_status != HAL_OK)
+    (void)AppLog_Write("ESP32 UART transmit recovered (no receiver ACK)\r\n");
+  esp32_tx_status = tx_status;
+#endif
 #if APP_CONFIG_ENABLE_SD_LOGGING != 0U
   SDLogger_Process(&latest_weather_data, current_tick);
 #endif

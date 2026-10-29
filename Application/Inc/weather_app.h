@@ -6,7 +6,8 @@
 
 void WeatherApp_Init(I2C_HandleTypeDef *sensor_bus,
                      ADC_HandleTypeDef *rain_adc,
-                     UART_HandleTypeDef *debug_uart);
+                     UART_HandleTypeDef *debug_uart,
+                     UART_HandleTypeDef *esp_uart);
 void WeatherApp_Run(void);
 const WeatherData *WeatherApp_GetLatestData(void);
 

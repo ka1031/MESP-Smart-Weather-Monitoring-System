@@ -10,6 +10,9 @@
 #define SSD1306_HEIGHT       (64U)
 #define SSD1306_BUFFER_SIZE  (SSD1306_WIDTH * SSD1306_HEIGHT / 8U)
 
+/* 0 for genuine SSD1306 modules, 2 for SH1106 modules sold as "SSD1306". */
+#define SSD1306_COLUMN_OFFSET (0U)
+
 typedef struct
 {
   I2C_HandleTypeDef *i2c;
@@ -25,6 +28,7 @@ DeviceStatus SSD1306_Init(SSD1306_Handle *display,
                           uint8_t primary_address_7bit,
                           uint8_t secondary_address_7bit);
 void SSD1306_Clear(SSD1306_Handle *display);
+void SSD1306_ClearPage(SSD1306_Handle *display, uint8_t page);
 void SSD1306_DrawPixel(SSD1306_Handle *display,
                        uint8_t x,
                        uint8_t y,

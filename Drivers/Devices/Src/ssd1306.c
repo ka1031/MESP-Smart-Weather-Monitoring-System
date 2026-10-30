@@ -101,7 +101,7 @@ DeviceStatus SSD1306_Init(SSD1306_Handle *display,
                           uint8_t secondary_address_7bit)
 {
   static const uint8_t init_commands[] = {
-    0xAEU, 0x20U, 0x00U, 0xB0U, 0xC8U, 0x00U, 0x10U, 0x40U,
+    0xAEU, 0x20U, 0x02U, 0xB0U, 0xC8U, 0x00U, 0x10U, 0x40U,
     0x81U, 0x7FU, 0xA1U, 0xA6U, 0xA8U, 0x3FU, 0xA4U, 0xD3U,
     0x00U, 0xD5U, 0x80U, 0xD9U, 0xF1U, 0xDAU, 0x12U, 0xDBU,
     0x40U, 0x8DU, 0x14U, 0xAFU
@@ -177,6 +177,18 @@ void SSD1306_Clear(SSD1306_Handle *display)
   memset(display->framebuffer, 0, sizeof(display->framebuffer));
   display->cursor_x = 0U;
   display->cursor_page = 0U;
+}
+
+void SSD1306_ClearPage(SSD1306_Handle *display, uint8_t page)
+{
+  if ((display == NULL) || (page >= (SSD1306_HEIGHT / 8U)))
+  {
+    return;
+  }
+
+  memset(&display->framebuffer[(uint16_t)page * SSD1306_WIDTH],
+         0,
+         SSD1306_WIDTH);
 }
 
 void SSD1306_DrawPixel(SSD1306_Handle *display,
@@ -262,12 +274,7 @@ void SSD1306_WriteString(SSD1306_Handle *display, const char *text)
     glyph = SSD1306_GetGlyph(*text++);
     if (((uint16_t)display->cursor_x + 5U) >= SSD1306_WIDTH)
     {
-      display->cursor_x = 0U;
-      ++display->cursor_page;
-      if (display->cursor_page >= (SSD1306_HEIGHT / 8U))
-      {
-        break;
-      }
+      break; /* clip instead of wrapping onto the next row */
     }
 
     for (column = 0U; column < 5U; ++column)
@@ -306,7 +313,8 @@ DeviceStatus SSD1306_UpdateScreen(SSD1306_Handle *display)
     {
       return status;
     }
-    status = SSD1306_WriteCommand(display, 0x00U);
+    status = SSD1306_WriteCommand(display,
+                                  (uint8_t)(SSD1306_COLUMN_OFFSET & 0x0FU));
     if (status != DEVICE_STATUS_OK)
     {
       return status;

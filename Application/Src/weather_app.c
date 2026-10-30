@@ -259,6 +259,7 @@ static void WeatherApp_PrintRainMeasurement(
 
 static void WeatherApp_WriteDisplayLine(uint8_t page, const char *text)
 {
+  SSD1306_ClearPage(&oled, page);
   SSD1306_SetCursor(&oled, 4U, page);
   SSD1306_WriteString(&oled, text);
 }
@@ -353,36 +354,46 @@ static void WeatherApp_UpdateDisplay(void)
                    (latest_weather_data.rain_wet != 0U) ? "WET" : "DRY",
                    (unsigned int)latest_weather_data.rain_raw);
     WeatherApp_WriteDisplayLine(6U, line);
-
-    (void)snprintf(line,
-                   sizeof(line),
-                   "RAIN LEVEL %u PCT",
-                   (unsigned int)latest_weather_data.rain_percent);
-#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U || APP_CONFIG_ENABLE_SD_LOGGING != 0U
-    if (((HAL_GetTick() / 4000U) & 1U) != 0U)
-#endif
-      WeatherApp_WriteDisplayLine(7U, line);
   }
   else
   {
     WeatherApp_WriteDisplayLine(6U, "RAIN SENSOR ERROR");
   }
 
-#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U || APP_CONFIG_ENABLE_SD_LOGGING != 0U
-  if (((HAL_GetTick() / 4000U) & 1U) == 0U)
+  /* Page 7 rotation: rain level (0-2s), classification (2-4s), SD status (4-6s) */
+  uint32_t rotation_state = (HAL_GetTick() / 2000U) % 3U;
+  if (rotation_state == 0U)
   {
+    /* Rain level */
+    if ((latest_weather_data.valid_flags & WEATHER_DATA_VALID_RAIN) != 0U)
+    {
+      (void)snprintf(line,
+                     sizeof(line),
+                     "RAIN LEVEL %u PCT",
+                     (unsigned int)latest_weather_data.rain_percent);
+      WeatherApp_WriteDisplayLine(7U, line);
+    }
+  }
+  else if (rotation_state == 1U)
+  {
+    /* Classification status */
+    (void)snprintf(line,
+                   sizeof(line),
+                   "STATUS: %s",
+                   WeatherStatus_Name(latest_weather_data.weather_status));
+    WeatherApp_WriteDisplayLine(7U, line);
+  }
+  else
+  {
+    /* SD status */
+#if APP_CONFIG_ENABLE_SD_DIAGNOSTIC != 0U || APP_CONFIG_ENABLE_SD_LOGGING != 0U
 #if APP_CONFIG_ENABLE_SD_LOGGING != 0U
     SDLogger_DisplayText(line, sizeof(line));
 #else
     SDDiagnostic_Display(line, sizeof(line));
 #endif
     WeatherApp_WriteDisplayLine(7U, line);
-  }
 #endif
-  /* Alternate the date header with classification; retain sensor/SD rows. */
-  if (((HAL_GetTick() / 2000U) & 1U) != 0U) {
-    WeatherApp_WriteDisplayLine(0U, WeatherStatus_Name(latest_weather_data.weather_status));
-    WeatherApp_WriteDisplayLine(5U, WeatherReason_Primary(latest_weather_data.weather_reasons));
   }
   update_status = SSD1306_UpdateScreen(&oled);
   oled_status = update_status;

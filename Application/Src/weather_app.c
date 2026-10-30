@@ -1,4 +1,5 @@
 #include "weather_app.h"
+#include "weather_classification.h"
 #include "esp32_link.h"
 #include "sd_diagnostic.h"
 #include "sd_logger.h"
@@ -20,6 +21,7 @@
 #include <stdio.h>
 
 static WeatherData latest_weather_data;
+static WeatherClassifier classifier;
 #if APP_CONFIG_ENABLE_ESP32_LINK != 0U
 static ESP32Link_Handle esp32_link;
 static HAL_StatusTypeDef esp32_tx_status;
@@ -31,6 +33,9 @@ static SSD1306_Handle oled;
 static DS3231_Handle rtc;
 static I2C_HandleTypeDef *rtc_bus;
 static DeviceStatus rtc_status = DEVICE_STATUS_NOT_INITIALIZED;
+#if APP_CONFIG_RTC_AUTO_SET != 0U
+static uint8_t rtc_fallback_checked;
+#endif
 
 static DeviceStatus bme280_status = DEVICE_STATUS_NOT_INITIALIZED;
 static DeviceStatus bh1750_status = DEVICE_STATUS_NOT_INITIALIZED;
@@ -71,6 +76,32 @@ static void WeatherApp_ReadRtc(void)
     rtc_status = DS3231_Init(&rtc, rtc_bus, APP_CONFIG_DS3231_ADDRESS);
   if (rtc.initialized != 0U)
     rtc_status = DS3231_ReadDateTime(&rtc, &dt);
+#if APP_CONFIG_RTC_AUTO_SET != 0U
+  if (!rtc_fallback_checked && rtc.initialized != 0U) {
+    if (rtc_status == DEVICE_STATUS_OK) rtc_fallback_checked = 1U;
+    else if (rtc_status == DEVICE_STATUS_TIME_NOT_SET || rtc_status == DEVICE_STATUS_DATA_ERROR) {
+      rtc_fallback_checked = 1U; /* A failed write is not repeated every sample. */
+      DS3231_DateTime fallback = {
+        .year = APP_CONFIG_RTC_START_YEAR, .month = APP_CONFIG_RTC_START_MONTH,
+        .day = APP_CONFIG_RTC_START_DAY, .weekday = 1U,
+        .hour = APP_CONFIG_RTC_START_HOUR, .minute = APP_CONFIG_RTC_START_MINUTE,
+        .second = APP_CONFIG_RTC_START_SECOND
+      };
+      /* Calculate weekday from the configured date, with 1=Sunday. */
+      if (DS3231_IsValidDateTime(&fallback)) {
+        static const uint8_t offsets[] = {0,3,2,5,0,3,5,1,4,6,2,4};
+        uint32_t year = fallback.year - (fallback.month < 3U);
+        fallback.weekday = (uint8_t)((year + year/4U - year/100U + year/400U +
+            offsets[fallback.month - 1U] + fallback.day) % 7U + 1U);
+      }
+      rtc_status = DS3231_SetDateTime(&rtc, &fallback);
+      if (rtc_status == DEVICE_STATUS_OK) {
+        (void)AppLog_Write("RTC initialized from configured fallback (not synchronized)\r\n");
+        rtc_status = DS3231_ReadDateTime(&rtc, &dt);
+      } else WeatherApp_LogStatus("RTC", "fallback setup", DS3231_StatusString(rtc_status));
+    }
+  }
+#endif
   if (rtc_status == DEVICE_STATUS_OK)
   {
     latest_weather_data.timestamp = (WeatherTimestamp){
@@ -348,6 +379,11 @@ static void WeatherApp_UpdateDisplay(void)
     WeatherApp_WriteDisplayLine(7U, line);
   }
 #endif
+  /* Alternate the date header with classification; retain sensor/SD rows. */
+  if (((HAL_GetTick() / 2000U) & 1U) != 0U) {
+    WeatherApp_WriteDisplayLine(0U, WeatherStatus_Name(latest_weather_data.weather_status));
+    WeatherApp_WriteDisplayLine(5U, WeatherReason_Primary(latest_weather_data.weather_reasons));
+  }
   update_status = SSD1306_UpdateScreen(&oled);
   oled_status = update_status;
   if (update_status != DEVICE_STATUS_OK)
@@ -446,6 +482,10 @@ void WeatherApp_Init(I2C_HandleTypeDef *sensor_bus,
 {
   AppLog_Init(debug_uart);
   latest_weather_data = (WeatherData){0};
+  WeatherClassifier_Init(&classifier);
+#if APP_CONFIG_RTC_AUTO_SET != 0U
+  rtc_fallback_checked = 0U;
+#endif
 
   if ((sensor_bus == NULL) || (rain_adc == NULL) || (debug_uart == NULL))
   {
@@ -457,7 +497,7 @@ void WeatherApp_Init(I2C_HandleTypeDef *sensor_bus,
 #if APP_CONFIG_ENABLE_ESP32_LINK != 0U
   esp32_tx_status = ESP32Link_Init(&esp32_link, esp_uart);
   (void)AppLog_Write(esp32_tx_status == HAL_OK
-      ? "ESP32 output: USART2 PA2, 115200 8N1, MESP protocol v1\r\n"
+      ? "ESP32 output: USART2 PA2, 115200 8N1, MESP protocol v2\r\n"
       : "ESP32 output unavailable: invalid USART2 handle\r\n");
 #else
   (void)esp_uart;
@@ -565,6 +605,13 @@ void WeatherApp_Run(void)
   WeatherApp_ReadBme280();
   WeatherApp_ReadBh1750();
   WeatherApp_ReadRainSensor();
+  WeatherClassifier_Update(&classifier, &latest_weather_data, current_tick);
+  char classification[96];
+  (void)snprintf(classification, sizeof(classification), "Weather: %s; %s; reasons=%u\r\n",
+      WeatherStatus_Name(latest_weather_data.weather_status),
+      WeatherReason_Primary(latest_weather_data.weather_reasons),
+      (unsigned)latest_weather_data.weather_reasons);
+  (void)AppLog_Write(classification);
 #if APP_CONFIG_ENABLE_ESP32_LINK != 0U
   HAL_StatusTypeDef tx_status = ESP32Link_Send(&esp32_link, &latest_weather_data, current_tick);
   if (tx_status != HAL_OK && esp32_tx_status == HAL_OK)

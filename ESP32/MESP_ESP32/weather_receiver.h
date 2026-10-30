@@ -10,6 +10,9 @@ struct WeatherSample {
   uint32_t sequence, uptime;
   char timestamp[20];
   uint8_t flags;
+  char weatherStatus[13];
+  uint8_t weatherReasons;
+  bool classificationAvailable;
   bool timeValid;
   double values[7]; // temperature, humidity, pressure, light, rain raw, %, wet
   bool present[7];
@@ -111,14 +114,31 @@ class WeatherReceiver {
     }
     if (crc(buffer + 1, size_t(star - buffer - 1)) != expected) return false;
     *star = 0;
-    char *fields[14]; unsigned count = 1; fields[0] = buffer + 1;
+    char *fields[16]; unsigned count = 1; fields[0] = buffer + 1;
     for (char *p = buffer + 1; *p; ++p) {
       if (*p == ',') {
-        if (count == 14) return false;
+        if (count == 16) return false;
         *p = 0; fields[count++] = p + 1;
       }
     }
-    if (count != 14 || strcmp(fields[0], "MESP") || strcmp(fields[1], "1")) return false;
+    if (strcmp(fields[0], "MESP")) return false;
+    const bool v1 = count == 14 && strcmp(fields[1], "1") == 0;
+    const bool v2 = count == 16 && strcmp(fields[1], "2") == 0;
+    if (!v1 && !v2) return false;
+    strcpy(out.weatherStatus, "UNKNOWN");
+    out.classificationAvailable = v2;
+    if (v2) {
+      uint32_t reasons;
+      if (!integer(fields[15], 127, reasons)) return false;
+      if (strcmp(fields[14], "UNKNOWN") && strcmp(fields[14], "NORMAL") &&
+          strcmp(fields[14], "UNFAVORABLE") && strcmp(fields[14], "SEVERE")) return false;
+      if (!strcmp(fields[14], "NORMAL") && reasons != 0) return false;
+      if (!strcmp(fields[14], "UNKNOWN") && (reasons & 15)) return false;
+      if ((!strcmp(fields[14], "UNFAVORABLE") || !strcmp(fields[14], "SEVERE")) &&
+          (!reasons || (reasons & 112))) return false;
+      if (!strcmp(fields[14], "SEVERE") && !(reasons & 3)) return false;
+      strcpy(out.weatherStatus, fields[14]); out.weatherReasons = uint8_t(reasons);
+    }
     uint32_t timeValid, flags;
     if (!integer(fields[2], UINT32_MAX, out.sequence) ||
         !integer(fields[3], UINT32_MAX, out.uptime) ||

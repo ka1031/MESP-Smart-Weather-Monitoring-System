@@ -29,7 +29,7 @@ int main(void)
     .illuminance_lux = 123.75F, .rain_raw = 3000U, .rain_percent = 27U, .rain_wet = 0U,
     .timestamp = {2026U, 10U, 28U, 14U, 32U, 5U}, .valid_flags = 15U
   };
-  const char expected[] = "$MESP,1,42,1234,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15*4E4C\r\n";
+  const char expected[] = "$MESP,2,42,1234,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15,UNKNOWN,0*87F2\r\n";
   char packet[ESP32_LINK_PACKET_CAPACITY];
   size_t length = ESP32Link_Format(packet, sizeof(packet), &sample, 1234U, 42U);
   assert(length == strlen(expected) && strcmp(packet, expected) == 0);
@@ -52,7 +52,7 @@ int main(void)
   WeatherData missing = sample;
   missing.valid_flags = 0U;
   assert(ESP32Link_Format(packet, sizeof(packet), &missing, UINT32_MAX, UINT32_MAX) > 0U);
-  assert(strstr(packet, "4294967295,4294967295,,0,,,,,,,,0*") != NULL);
+  assert(strstr(packet, "4294967295,4294967295,,0,,,,,,,,0,UNKNOWN,0*") != NULL);
   fputs(packet, stdout);
   WeatherData extreme = sample;
   extreme.temperature_c = -1000000.0F;
@@ -64,7 +64,7 @@ int main(void)
   extreme.temperature_c = NAN; extreme.humidity_percent = INFINITY;
   extreme.pressure_hpa = -INFINITY; extreme.illuminance_lux = 2000000.0F;
   assert(ESP32Link_Format(packet, sizeof(packet), &extreme, 0U, 0U) > 0U);
-  assert(strstr(packet, ",1,,,,,65535,255,1,15*") != NULL);
+  assert(strstr(packet, ",1,,,,,65535,255,1,15,UNKNOWN,0*") != NULL);
   fputs(packet, stdout);
 
   ESP32Link_Handle link;
@@ -77,7 +77,7 @@ int main(void)
   assert(ESP32Link_Send(NULL, &sample, 0U) == HAL_ERROR);
   assert(ESP32Link_Init(&link, &uart) == HAL_OK);
   assert(ESP32Link_Send(&link, &sample, 0U) == HAL_OK && transmits == 1U);
-  assert(strncmp(transmitted, "$MESP,1,0,0,", 12U) == 0);
+  assert(strncmp(transmitted, "$MESP,2,0,0,", 12U) == 0);
   const HAL_StatusTypeDef failures[] = {HAL_TIMEOUT, HAL_BUSY, HAL_ERROR};
   for (unsigned i = 0U; i < 3U; ++i) {
     transmit_status = failures[i];
@@ -86,7 +86,7 @@ int main(void)
   }
   transmit_status = HAL_OK;
   assert(ESP32Link_Send(&link, &sample, 4000U) == HAL_OK && transmits == 5U);
-  assert(strncmp(transmitted, "$MESP,1,4,4000,", 15U) == 0);
+  assert(strncmp(transmitted, "$MESP,2,4,4000,", 15U) == 0);
   assert(link.sent_packets == 2U && link.next_sequence == 5U);
   assert(ESP32Link_Send(&link, NULL, 5000U) == HAL_ERROR && transmits == 5U);
   assert(link.failed_packets == 4U && link.next_sequence == 6U);

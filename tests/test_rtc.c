@@ -2,6 +2,7 @@
 #include "rtc_console.h"
 #include "app_log.h"
 #include "weather_app.h"
+#include "weather_classification.h"
 #include "bme280.h"
 #include "bh1750.h"
 #include "rain_sensor.h"
@@ -26,7 +27,7 @@ HAL_StatusTypeDef HAL_UART_Transmit(UART_HandleTypeDef *h, const uint8_t *p,
   assert(h == &esp_uart && n < sizeof(esp_packet));
   assert(timeout == APP_CONFIG_ESP32_UART_TIMEOUT_MS);
   memcpy(esp_packet, p, n); esp_packet[n] = '\0';
-  assert(strncmp(esp_packet, "$MESP,1,", 8U) == 0);
+  assert(strncmp(esp_packet, "$MESP,2,", 8U) == 0);
   ++esp_transmits;
   return esp_tx_result;
 }
@@ -264,6 +265,7 @@ void SSD1306_WriteString(SSD1306_Handle *d, const char *text)
 DeviceStatus SSD1306_UpdateScreen(SSD1306_Handle *d) {(void)d; return DEVICE_STATUS_OK;}
 const char *SSD1306_StatusString(DeviceStatus s) {(void)s; return "test";}
 
+#if APP_CONFIG_RTC_AUTO_SET == 0U
 static void TestApplication(void)
 {
   ADC_HandleTypeDef adc;
@@ -276,6 +278,7 @@ static void TestApplication(void)
 #else
   assert(esp_transmits == 0U);
 #endif
+  assert(data->weather_status == WEATHER_UNKNOWN && data->weather_reasons == WEATHER_REASON_STARTUP);
   assert(sensor_reads == 3U && (data->valid_flags & 7U) == 7U);
   assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
   assert(data->timestamp.year == 0 && strstr(output, "timestamp INVALID"));
@@ -303,7 +306,12 @@ static void TestApplication(void)
   assert(strstr(display_lines[1], "TEMP") && strstr(display_lines[6], "RAIN"));
   read_status = HAL_TIMEOUT; tick += 1000U; WeatherApp_Run();
   assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP) && data->timestamp.year == 0);
-  assert(sensor_reads == 9U && strcmp(display_lines[5], "RTC ERROR") == 0);
+  assert(sensor_reads == 9U && data->weather_status == WEATHER_NORMAL);
+  assert(strcmp(display_lines[0], "NORMAL") == 0);
+  assert(strcmp(display_lines[5], "WITHIN LIMITS") == 0);
+#if APP_CONFIG_ENABLE_ESP32_LINK != 0U
+  assert(strstr(esp_packet, ",NORMAL,0*") != NULL);
+#endif
   read_status = HAL_OK; tick += 1000U; WeatherApp_Run();
   assert(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP);
   registers[0x0F] |= 0x80U; tick += 1000U; WeatherApp_Run();
@@ -336,8 +344,62 @@ static void TestApplication(void)
 #endif
 }
 
+#else
+static void TestAutoSet(void)
+{
+  ADC_HandleTypeDef adc;
+  Reset(); tick = 0; registers[0x0F] = 0x80;
+  WeatherApp_Init(&bus, &adc, &uart, &esp_uart);
+  WeatherApp_Run();
+  const WeatherData *data = WeatherApp_GetLatestData();
+  assert(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP);
+  assert(data->timestamp.year == APP_CONFIG_RTC_START_YEAR);
+  assert(data->timestamp.month == APP_CONFIG_RTC_START_MONTH);
+  assert(data->timestamp.day == APP_CONFIG_RTC_START_DAY);
+  assert(data->timestamp.hour == APP_CONFIG_RTC_START_HOUR);
+  assert(data->timestamp.minute == APP_CONFIG_RTC_START_MINUTE);
+  assert(data->timestamp.second == APP_CONFIG_RTC_START_SECOND);
+  assert(registers[3] == 6U); /* Friday, 2026-10-30. */
+  assert(strstr(output, "configured fallback") != NULL);
+  unsigned writes = write_count;
+  tick += 1000; WeatherApp_Run(); assert(write_count == writes);
+  // A reboot preserves an already-running clock, including manual adjustments.
+  Command("TIME SET 2027-01-02 03:04:05\n");
+  writes = write_count;
+  WeatherApp_Init(&bus, &adc, &uart, &esp_uart); WeatherApp_Run();
+  assert(write_count == writes && data->timestamp.year == 2027 && data->timestamp.hour == 3);
+  // Later power-loss indication is not silently overwritten during this boot.
+  registers[0x0F] |= 0x80;
+  tick += 1000; WeatherApp_Run();
+  assert(write_count == writes && !(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
+  // A failed initial calendar write remains invalid and is not retried in a loop.
+  Reset(); tick = 0; registers[0x0F] = 0x80; fail_write_reg = 0;
+  WeatherApp_Init(&bus, &adc, &uart, &esp_uart); WeatherApp_Run();
+  assert(!(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
+  writes = write_count; fail_write_reg = -1;
+  tick += 1000; WeatherApp_Run(); assert(write_count == writes);
+  // I2C failure alone never triggers a date write; recovery permits initial seeding.
+  Reset(); tick = 0; registers[0x0F] = 0x80;
+  WeatherApp_Init(&bus, &adc, &uart, &esp_uart);
+  read_status = HAL_TIMEOUT; writes = write_count; WeatherApp_Run();
+  assert(write_count == writes && !(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP));
+  read_status = HAL_OK; tick += 1000; WeatherApp_Run();
+  assert(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP);
+  // A malformed calendar with OSF clear also receives the configured fallback.
+  Reset(); tick = 0;
+  WeatherApp_Init(&bus, &adc, &uart, &esp_uart); WeatherApp_Run();
+  assert(data->valid_flags & WEATHER_DATA_VALID_TIMESTAMP);
+  puts("RTC automatic fallback, valid-clock preservation, write failure and recovery passed");
+}
+#endif
+
 int main(void)
 {
-  TestCalendar(); TestReadFormats(); TestPowerAndErrors(); TestConsole(); TestApplication();
+  TestCalendar(); TestReadFormats(); TestPowerAndErrors(); TestConsole();
+#if APP_CONFIG_RTC_AUTO_SET != 0U
+  TestAutoSet();
+#else
+  TestApplication();
+#endif
   return 0;
 }

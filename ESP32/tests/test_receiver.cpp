@@ -20,6 +20,7 @@ int main() {
   assert(feed(r, golden));
   assert(r.sample.sequence == 42 && r.sample.values[0] == -0.25);
   assert(r.sample.flags == 15 && r.sample.timeValid);
+  assert(!r.sample.classificationAvailable && !strcmp(r.sample.weatherStatus, "UNKNOWN"));
   assert(r.fresh(5100) && !r.fresh(5101));
   std::string corrupt = golden; corrupt[20] ^= 1;
   assert(!feed(r, corrupt)); assert(r.accepted == 1 && r.rejected == 1);
@@ -51,6 +52,16 @@ int main() {
   assert(r.fresh(20));
   feed(r, "$MESP", UINT32_MAX - 50); r.expire(300);
   assert(feed(r, golden, 301));
+  const std::string v2base="MESP,2,42,1234,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15,";
+  assert(feed(r, frame(v2base + "SEVERE,2")));
+  assert(r.sample.classificationAvailable && !strcmp(r.sample.weatherStatus, "SEVERE") && r.sample.weatherReasons == 2);
+  assert(feed(r, frame(v2base + "UNFAVORABLE,12")));
+  assert(feed(r, frame(v2base + "NORMAL,0")));
+  assert(feed(r, frame(v2base + "UNKNOWN,64")));
+  for (const char *bad : {"NORMAL,1", "UNKNOWN,1", "UNFAVORABLE,0", "SEVERE,8", "SEVERE,129", "CLEAR,0", "NORMAL"})
+    assert(!feed(r, frame(v2base + bad)));
+  assert(feed(r, golden));
+  assert(!r.sample.classificationAvailable && r.sample.weatherReasons == 0);
   // Exercise arbitrary bytes and frame boundaries under sanitizers.
   uint32_t random = 42;
   for (unsigned i = 0; i < 100000; ++i) {

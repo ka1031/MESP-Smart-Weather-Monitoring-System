@@ -38,7 +38,9 @@ the current file.
 
 Columns are `uptime_ms`, `timestamp`, `time_valid`, `temperature_c`,
 `humidity_pct`, `pressure_hpa`, `light_lux`, `rain_raw`, `rain_pct`, `rain_wet`,
-and `valid_flags`.
+`valid_flags`, `weather_status`, and `weather_reasons`.
+See [classification rules](weather_classification.md) for the status and reason bits.
+Older logs retain their original headers.
 
 The timestamp comes from the DS3231 in the same sensor sample. If its time is
 invalid, the timestamp is blank and `time_valid` is zero; sensor logging still

@@ -3,16 +3,19 @@ ESP32 validation
 Target: ESP32 Dev Module, ESP-WROOM-32, 4 MB flash
 Platform: Espressif32 6.12.0 / Arduino-ESP32 2.0.17
 Build: passed
-RAM: 45,608 / 327,680 bytes
-Application flash: approximately 785 KB / 1,310,720 bytes
+RAM: 45,624 / 327,680 bytes
+Application flash: 786,561 / 1,310,720 bytes
 
 Parser tests passed with AddressSanitizer and UndefinedBehaviorSanitizer:
 - CRC reference vector and STM32 example packet
+- Protocol v1/v2 compatibility and classification field validation
+- STM32 classification and formatting through the actual ESP32 parser
 - Field count, numeric ranges, missing values and calendar dates
 - Corrupt, partial and oversized frames
 - Stream recovery, stale detection and timer rollover
 - Arbitrary byte input
 
 STM32 sender packet tests: passed
-ESP32 upload: confirmed successful
+Previous receiver upload: confirmed successful
+Classification update: builds and host tests passed; hardware upload pending
 Wired reception and browser dashboard: confirmation pending

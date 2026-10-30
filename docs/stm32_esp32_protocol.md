@@ -1,4 +1,4 @@
-# STM32 to ESP32 weather link, version 1
+# STM32 to ESP32 weather link, version 2
 
 The STM32 sender and the separate `ESP32/` receiver are implemented. The receiver
 provides a local Wi-Fi page; cloud publishing remains future work. The sensors, RTC console, OLED and
@@ -23,14 +23,14 @@ Each ASCII frame starts with `$`, ends with CRLF, and has a four-digit uppercase
 hexadecimal checksum after `*`. The terminating C-string NUL is not transmitted.
 
 ```text
-$MESP,1,sequence,uptime_ms,timestamp,time_valid,temperature_c,humidity_pct,pressure_hpa,light_lux,rain_raw,rain_pct,rain_wet,valid_flags*CRC16\r\n
+$MESP,2,sequence,uptime_ms,timestamp,time_valid,temperature_c,humidity_pct,pressure_hpa,light_lux,rain_raw,rain_pct,rain_wet,valid_flags,weather_status,weather_reasons*CRC16\r\n
 ```
 
 The `\r\n` above represents actual carriage-return and line-feed bytes.
 The fields between `$` and `*`, in order, are:
 
 1. `MESP`: fixed message identifier.
-2. `1`: protocol version.
+2. `2`: protocol version.
 3. `sequence`: unsigned 32-bit transmission-attempt number, starting at zero.
 4. `uptime_ms`: unsigned 32-bit tick captured at the beginning of the sample cycle.
 5. `timestamp`: `YYYY-MM-DD HH:MM:SS` from the DS3231, or an empty field.
@@ -43,13 +43,16 @@ The fields between `$` and `*`, in order, are:
 12. `rain_pct`: estimated plate wetness, normally 0–100, or empty. Not rainfall in mm.
 13. `rain_wet`: 0=dry, 1=wet, or empty.
 14. `valid_flags`: decimal bit mask: BME280=1, BH1750=2, rain=4, RTC=8.
+15. `weather_status`: UNKNOWN, NORMAL, UNFAVORABLE or SEVERE.
+16. `weather_reasons`: decimal reason mask; see [classification](weather_classification.md).
 
 Do not discard empty fields when splitting the CSV. A missing/invalid sensor
 produces empty values rather than stale readings or fabricated zeros. Non-finite
 and out-of-format-range float values are also blanked; the validity flags retain
 the original sensor-group validity, so receivers must check field presence too.
-There is no wind field or weather-classification field. No `NORMAL` status is
-invented while classification is unimplemented.
+There is no wind field. Classification uses the configured STM32 thresholds.
+The receiver also accepts legacy v1 frames with 14 fields and marks their
+classification unavailable. Upload the new ESP32 receiver before the STM32.
 
 The timestamp has the RTC's configured local time and no timezone suffix. All
 readings belong to one sequential sampling cycle, not simultaneous acquisitions.
@@ -62,17 +65,17 @@ CRC-16/CCITT-FALSE: polynomial `0x1021`, initial value `0xFFFF`, no reflection,
 and no final XOR. Calculate over the exact ASCII bytes after `$` and before `*`;
 exclude both delimiters, the checksum text, and CRLF.
 
-This complete example has checksum `4E4C` (append actual CRLF when sending):
+This complete example has checksum `87F2` (append actual CRLF when sending):
 
 ```text
-$MESP,1,42,1234,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15*4E4C
+$MESP,2,42,1234,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15,UNKNOWN,0*87F2
 ```
 
 The receiver should accumulate up to 319 bytes including CRLF, plus one byte
 for a local NUL terminator if needed. A fresh `$` restarts frame collection so
 a reset or partial transmission cannot permanently desynchronize the stream.
 Discard oversized frames, invalid checksums, unsupported versions, and records
-with a field count other than 14. Validate numeric ranges before using values.
+with a field count other than 16 for v2 (14 for legacy v1). Validate numeric ranges before using values.
 On an incomplete frame, wait for the next `$` or discard after a finite timeout.
 CRC detects corruption, not sender identity or guaranteed delivery.
 

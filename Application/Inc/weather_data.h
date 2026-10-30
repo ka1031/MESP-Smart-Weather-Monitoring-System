@@ -33,6 +33,8 @@ typedef struct
   uint8_t rain_wet;
   WeatherTimestamp timestamp;
   uint32_t valid_flags;
+  uint8_t weather_status; /* WeatherStatus; zero-initialized samples are UNKNOWN. */
+  uint8_t weather_reasons;
 } WeatherData;
 
 #endif /* WEATHER_DATA_H */

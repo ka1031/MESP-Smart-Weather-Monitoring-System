@@ -17,16 +17,19 @@ body{font:18px system-ui;background:#eef4f6;color:#182c38;max-width:760px;margin
 h1{font-size:30px}#status{padding:16px;background:#fff;border-radius:12px}
 dl{display:grid;grid-template-columns:1fr 1fr;gap:16px;background:white;padding:24px;border-radius:12px}
 dd{margin:0;font-weight:600}small{color:#465b68}</style>
-<h1>MESP Weather Station</h1><p id="status">Connecting…</p><p id="time"></p><dl id="readings"></dl>
-<small>Rain percentage measures sensor plate wetness, not rainfall depth. Weather classification is not enabled.</small>
+<h1>MESP Weather Station</h1><p id="status">Connecting…</p><p id="classification"></p><p id="time"></p><dl id="readings"></dl>
+<small>Rain percentage measures sensor plate wetness, not rainfall depth. Classification uses prototype thresholds, not an official weather warning.</small>
 <script>
 const labels=['Temperature','Humidity','Pressure','Light','Rain ADC','Plate wetness','Rain detected'];
 const units=[' °C',' %',' hPa',' lux','',' %',''];
 async function refresh(){try{const r=await fetch('/api/readings',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();
 document.getElementById('status').textContent=!d.has_sample?'Waiting for STM32':d.fresh?'Live • valid packets '+d.accepted+' • rejected '+d.rejected:'STALE • no valid packet for '+Math.floor(d.age_ms/1000)+' seconds';
+const reasonNames=[[1,'High temperature'],[2,'Low temperature'],[4,'High humidity'],[8,'Rain detected'],[16,'Required sensor missing'],[32,'Invalid sensor data'],[64,'Checking samples']];
+const reasons=reasonNames.filter(([bit])=>d.weather_reasons&bit).map(([,name])=>name).join(', ');
+document.getElementById('classification').textContent=!d.has_sample?'Weather: waiting for readings':!d.classification_available?'Weather: unavailable (STM32 protocol v1)':(d.fresh?'Weather: ':'Last weather status (stale): ')+d.weather_status+' — '+(reasons||'Within configured limits');
 document.getElementById('time').textContent=d.timestamp?'Last sample: '+d.timestamp+' (RTC local time)':'RTC time unavailable';
 const list=document.getElementById('readings');list.replaceChildren();labels.forEach((name,i)=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;const v=d.values[i];dd.textContent=v===null?'Unavailable':i===6?(v?'Wet':'Dry'):v+units[i];list.append(dt,dd)});
-}catch(e){document.getElementById('status').textContent='Disconnected from ESP32 — readings below may be old';}
+}catch(e){document.getElementById('status').textContent='Disconnected from ESP32 — readings below may be old';document.getElementById('classification').textContent='Weather: connection lost';}
 setTimeout(refresh,1000);}refresh();</script></html>)HTML";
 
 static void sendReadings() {
@@ -41,6 +44,9 @@ static void sendReadings() {
   json += ",\"sequence\":"; json += String(receiver.sample.sequence);
   json += ",\"uptime_ms\":"; json += String(receiver.sample.uptime);
   json += ",\"valid_flags\":"; json += String(receiver.sample.flags);
+  json += ",\"classification_available\":"; json += receiver.sample.classificationAvailable ? "true" : "false";
+  json += ",\"weather_status\":\""; json += receiver.hasSample ? receiver.sample.weatherStatus : "UNKNOWN"; json += '\"';
+  json += ",\"weather_reasons\":"; json += String(receiver.sample.weatherReasons);
   json += ",\"timestamp\":";
   if (receiver.hasSample && receiver.sample.timeValid) {
     json += '"'; json += receiver.sample.timestamp; json += '"';
@@ -78,6 +84,8 @@ void loop() {
       Serial.printf("RX OK seq=%lu RTC=%s flags=%u\n",
         (unsigned long)receiver.sample.sequence,
         receiver.sample.timeValid ? receiver.sample.timestamp : "unavailable", receiver.sample.flags);
+      Serial.printf("Weather: %s reasons=%u%s\n", receiver.sample.weatherStatus,
+        receiver.sample.weatherReasons, receiver.sample.classificationAvailable ? "" : " (v1: unavailable)");
       Serial.print("T,H,P,L,rain_raw,rain_pct,rain_wet: ");
       for (unsigned j = 0; j < 7; ++j) {
         if (j) Serial.print(',');

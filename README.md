@@ -14,10 +14,12 @@ not currently require an RTOS or an additional application framework.
 - Matching diagnostics through USART1 at 115200 baud
 - SD CSV logging every five seconds, with RTC timestamps and safe stop/start commands
 - Versioned, checksummed sensor packets on USART2 for an ESP32 receiver
+- Weather classification with confirmation delays, reasons and sensor-fault handling
 - PC13 heartbeat toggled after every one-second sample
 
 ESP32 receiver firmware and a local Wi-Fi readings page are provided in `ESP32/`.
-Cloud connectivity and weather classification remain future work.
+Cloud connectivity and LED/buzzer alerts remain future work.
+See [weather classification](docs/weather_classification.md) for rules and thresholds.
 Local SD logging and the STM32 UART sender are implemented. Wind sensing has
 been removed from scope; the SSD1306 OLED replaces the proposed 20×4 LCD.
 
@@ -83,7 +85,7 @@ seconds. The OLED shows `SD LOG <rows>`; USART1 supports `SD?`, `SD START`, and
 See [SD logging instructions](docs/sd_logging.md). The [read-only diagnostic](docs/sd_diagnostic.md)
 remains available as a separate build-time mode.
 
-The STM32 sends a `$MESP,1,...*CRC16` packet over USART2 after each sensor sample,
+The STM32 sends a `$MESP,2,...*CRC16` packet over USART2 after each sensor sample,
 normally once per second. Connect PA2 to ESP32 GPIO16 and share ground. PA3 to
 GPIO17 is reserved for future return traffic. USART1 retains its debug console.
 See [STM32–ESP32 protocol](docs/stm32_esp32_protocol.md) for fields, checksum,
@@ -174,13 +176,23 @@ Replace the example with the actual current date/time. Commands are case-sensiti
 Dates are validated, including leap days, in the range 2000-2099; hours use
 24-hour format. Weekday is calculated automatically. The stored time has no
 time-zone metadata: use local time consistently (e.g. IST) or UTC consistently.
-No build-time date is written automatically, and no internet synchronization is
-performed. The driver reads both 12-hour and 24-hour clocks, and writes 24-hour mode.
+`APP_CONFIG_RTC_AUTO_SET` enables automatic initialization of an unset or invalid
+RTC on the first successful startup check. The fixed fallback in
+`Application/Inc/app_config.h` is **2026-10-30 15:53:44 IST**. Edit the
+`APP_CONFIG_RTC_START_*` constants and rebuild to change it. Weekday is calculated
+automatically. A valid running clock is preserved, including manually set time.
+The fallback is a fixed starting point, not current-time synchronization.
+The driver reads both 12-hour and 24-hour clocks and writes 24-hour mode.
 
-Without a battery, the clock must be set again after RTC power is removed.
-Resetting just the STM32 preserves a still-powered RTC. Startup preserves the
-oscillator-stop flag; unset time is reported as `RTC TIME NOT SET` on the OLED
-and `timestamp INVALID` in serial samples. I2C faults display `RTC ERROR`.
+A working RTC backup battery keeps time while the station is powered off.
+Without backup power, the next boot may restart from the fixed fallback; time
+spent powered off cannot be recovered. Resetting just the STM32 preserves a
+valid RTC clock. A failed fallback write is reported and is not repeated every
+sample; reboot or use `TIME SET` after correcting the fault. I2C failures alone
+do not trigger a calendar write. After startup has accepted a valid clock, any
+later oscillator-stop indication remains invalid until manual correction or
+reboot. Set `APP_CONFIG_RTC_AUTO_SET` to `0U` for manual-only initialization:
+unset time then appears as `RTC TIME NOT SET` and `timestamp INVALID`. I2C faults display `RTC ERROR`.
 Sensor sampling continues in both cases. Invalid timestamps are zeroed and their
 validity flag is cleared, so consumers must check `WEATHER_DATA_VALID_TIMESTAMP`.
 The date occupies OLED row 0 and time row 5; existing sensor rows are retained.
@@ -201,5 +213,6 @@ Run host tests with `sh tests/run_rtc_tests.sh`. They use a fake HAL/register ma
 and do not require the board. Build firmware with the usual CMake presets.
 On hardware: confirm address 0x68 with the optional scanner, set time, check that
 seconds advance, reset the STM32 while keeping the RTC powered, then remove all
-power and confirm unset-time reporting. Also unplug the RTC and confirm sensors
+power and verify backup time retention, or fallback initialization if backup
+power was also removed. In manual-only mode, confirm unset-time reporting. Also unplug the RTC and confirm sensors
 continue with invalid timestamps. These hardware checks require the physical board.

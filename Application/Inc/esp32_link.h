@@ -14,7 +14,7 @@ typedef struct {
   char packet[ESP32_LINK_PACKET_CAPACITY];
 } ESP32Link_Handle;
 
-/* Wire format: $MESP,1,sequence,<weather CSV fields>*CRC16\r\n.
+/* Wire format: $MESP,2,sequence,<weather CSV fields>*CRC16\r\n.
  * Returns the wire length (excluding NUL), or zero without a usable packet.
  * CRC-16/CCITT-FALSE covers the bytes between '$' and '*', excluding both. */
 size_t ESP32Link_Format(char *buffer, size_t capacity, const WeatherData *sample,

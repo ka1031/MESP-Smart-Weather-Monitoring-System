@@ -78,10 +78,10 @@ static void CSVTests(void)
 {
   char output[256];
   assert(WeatherCSV_Format(output, sizeof(output), &sample, 1234U) > 0U);
-  assert(strcmp(output, "1234,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15\r\n") == 0);
+  assert(strcmp(output, "1234,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15,UNKNOWN,0\r\n") == 0);
   WeatherData invalid = sample; invalid.valid_flags = 0U;
   assert(WeatherCSV_Format(output, sizeof(output), &invalid, 0U) > 0U);
-  assert(strcmp(output, "0,,0,,,,,,,,0\r\n") == 0);
+  assert(strcmp(output, "0,,0,,,,,,,,0,UNKNOWN,0\r\n") == 0);
   invalid.valid_flags = 1U; invalid.temperature_c = NAN;
   assert(WeatherCSV_Format(output, sizeof(output), &invalid, 0U) > 0U);
   assert(strstr(output, "0,,0,,62.50,1008.25,") == output);
@@ -89,6 +89,10 @@ static void CSVTests(void)
   assert(WeatherCSV_Format(output, sizeof(output), &invalid, 0U) > 0U);
   assert(strstr(output, "inf") == NULL);
   assert(WeatherCSV_Format(output, 8U, &sample, 0U) == 0U);
+  WeatherData classified = sample;
+  classified.weather_status = 3U; classified.weather_reasons = 2U;
+  assert(WeatherCSV_Format(output, sizeof(output), &classified, 0U) > 0U);
+  assert(strstr(output, ",SEVERE,2\r\n") != NULL);
 }
 
 static void CheckFile(const char *name, const char *rows_text)
@@ -136,7 +140,7 @@ static void LoggingTests(void)
   SDLogger_Process(&sample, 11000U);
   assert(card_write_commands == writes);
   CheckFile("LOG00001.CSV",
-      "1000,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15\r\n6000,,0,,,,,,,,0\r\n");
+      "1000,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15,UNKNOWN,0\r\n6000,,0,,,,,,,,0,UNKNOWN,0\r\n");
   SDLogger_Start();
   unsigned int initializations = card_init_commands;
   SDLogger_Process(&sample, UINT32_MAX - 1999U);
@@ -145,8 +149,8 @@ static void LoggingTests(void)
   SDLogger_DisplayText(display, sizeof(display)); assert(strcmp(display, "SD LOG 2") == 0);
   SDLogger_Stop();
   CheckFile("LOG00002.CSV",
-      "4294965296,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15\r\n"
-      "3000,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15\r\n");
+      "4294965296,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15,UNKNOWN,0\r\n"
+      "3000,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15,UNKNOWN,0\r\n");
   /* Simulated reboot creates a fresh file, preserving earlier logs. */
   SDLogger_Init(&test_spi, GPIOA, GPIO_PIN_4);
   SDLogger_Process(&sample, 0U);
@@ -168,9 +172,9 @@ static void LoggingTests(void)
   assert(SDLogger_GetState() == SD_LOGGER_ACTIVE);
   assert(get_fattime() == ((1UL << 21) | (1UL << 16)));
   SDLogger_Stop();
-  CheckFile("LOG00004.CSV", "15000,,0,,,,,,,,0\r\n");
+  CheckFile("LOG00004.CSV", "15000,,0,,,,,,,,0,UNKNOWN,0\r\n");
   CheckFile("LOG00001.CSV",
-      "1000,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15\r\n6000,,0,,,,,,,,0\r\n");
+      "1000,2026-10-28 14:32:05,1,-0.25,62.50,1008.25,123.75,3000,27,0,15,UNKNOWN,0\r\n6000,,0,,,,,,,,0,UNKNOWN,0\r\n");
   puts("FatFs logging: cadence, RTC validity, stop/restart, reboot, preserved files and write failures passed");
 }
 

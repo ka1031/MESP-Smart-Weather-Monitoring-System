@@ -70,7 +70,21 @@ wet/dry state (1/0), in that order. Missing values are `null`. Check `has_sample
 and `fresh` before using readings. Timestamps use the STM32 RTC's local time.
 
 Rain percentage is plate wetness, not rainfall depth. Wind sensing is excluded
-from the project. Classification and cloud publishing are pending.
+from the project. Classification is calculated by the STM32 and shown on this page. Cloud publishing
+is pending.
+
+## Classification update
+
+Upload this ESP32 version before flashing the STM32 classification firmware.
+The receiver accepts v1 packets without classification and v2 packets with status
+and reason fields. Both boards need updated firmware to display classification.
+No wiring changes are required. The JSON adds `classification_available`,
+`weather_status` and `weather_reasons`. UNKNOWN indicates startup or a required
+sensor fault; it must not be treated as NORMAL.
+
+Reason bits are 1=high temperature, 2=low temperature, 4=high humidity,
+8=rain, 16=missing sensor, 32=invalid data, and 64=startup/checking.
+The dashboard displays the STM32 result; it does not independently classify.
 
 ## Tests
 

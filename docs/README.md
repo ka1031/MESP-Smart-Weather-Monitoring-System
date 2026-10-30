@@ -1,6 +1,7 @@
 # Project documentation
 
 - [Pin assignments](pin_mapping.md)
+- [Weather classification](weather_classification.md)
 - [SD logging and commands](sd_logging.md)
 - [SD read-only diagnostic](sd_diagnostic.md)
 - [STM32–ESP32 protocol](stm32_esp32_protocol.md)

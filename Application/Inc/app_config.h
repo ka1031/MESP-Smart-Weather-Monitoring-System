@@ -12,6 +12,18 @@
  */
 
 #define APP_CONFIG_SAMPLE_PERIOD_MS          (1000U)
+/* Prototype condition thresholds, not official weather-warning criteria.
+ * Pressure and light remain informational; rain uses the digital wet input. */
+#define APP_CONFIG_WEATHER_HOT_WARN_C         (35.0F)
+#define APP_CONFIG_WEATHER_HOT_SEVERE_C       (40.0F)
+#define APP_CONFIG_WEATHER_COLD_WARN_C        (10.0F)
+#define APP_CONFIG_WEATHER_COLD_SEVERE_C      (5.0F)
+#define APP_CONFIG_WEATHER_TEMP_HYST_C        (1.0F)
+#define APP_CONFIG_WEATHER_HUMID_WARN_PCT     (85.0F)
+#define APP_CONFIG_WEATHER_HUMID_HYST_PCT     (5.0F)
+#define APP_CONFIG_WEATHER_CONFIRM_SAMPLES   (3U)
+#define APP_CONFIG_WEATHER_CLEAR_SAMPLES     (10U)
+#define APP_CONFIG_WEATHER_MAX_GAP_MS        (5000U)
 #define APP_CONFIG_I2C_TIMEOUT_MS            (100U)
 #define APP_CONFIG_UART_TIMEOUT_MS           (100U)
 
@@ -36,6 +48,17 @@
 #define APP_CONFIG_ENABLE_BH1750              (1U)
 #define APP_CONFIG_ENABLE_RAIN_SENSOR         (1U)
 #define APP_CONFIG_ENABLE_DS3231              (1U)
+/* Seed an unset/invalid RTC once per boot. Preserve a valid running clock.
+ * Fixed local time (IST); this is a fallback, not live time synchronization. */
+#ifndef APP_CONFIG_RTC_AUTO_SET
+#define APP_CONFIG_RTC_AUTO_SET               (1U)
+#endif
+#define APP_CONFIG_RTC_START_YEAR             (2026U)
+#define APP_CONFIG_RTC_START_MONTH            (10U)
+#define APP_CONFIG_RTC_START_DAY              (31U)
+#define APP_CONFIG_RTC_START_HOUR             (9U)
+#define APP_CONFIG_RTC_START_MINUTE           (20U)
+#define APP_CONFIG_RTC_START_SECOND           (0U)
 #define APP_CONFIG_ENABLE_OLED                (1U)
 
 /* Keep the scanner available, but disabled during normal measurements. */

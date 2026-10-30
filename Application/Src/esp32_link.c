@@ -20,7 +20,7 @@ size_t ESP32Link_Format(char *buffer, size_t capacity, const WeatherData *sample
   if (buffer == NULL || capacity == 0U) return 0U;
   buffer[0] = '\0';
   if (sample == NULL) return 0U;
-  int prefix = snprintf(buffer, capacity, "$MESP,1,%lu,", (unsigned long)sequence);
+  int prefix = snprintf(buffer, capacity, "$MESP,2,%lu,", (unsigned long)sequence);
   if (prefix < 0 || (size_t)prefix >= capacity) goto invalid;
   size_t used = (size_t)prefix;
   /* Seven suffix bytes replace two CSV terminator bytes: reserve five more. */

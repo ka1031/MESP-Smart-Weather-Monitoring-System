@@ -1,10 +1,11 @@
 #include "weather_csv.h"
+#include "weather_classification.h"
 #include <math.h>
 #include <stdio.h>
 
 const char WEATHER_CSV_HEADER[] =
     "uptime_ms,timestamp,time_valid,temperature_c,humidity_pct,pressure_hpa,"
-    "light_lux,rain_raw,rain_pct,rain_wet,valid_flags\r\n";
+    "light_lux,rain_raw,rain_pct,rain_wet,valid_flags,weather_status,weather_reasons\r\n";
 
 /* Integer formatting avoids pulling newlib's large floating printf into flash. */
 static void Decimal(char output[20], float value, uint8_t valid)
@@ -43,9 +44,10 @@ size_t WeatherCSV_Format(char *buffer, size_t capacity,
     (void)snprintf(rain_pct, sizeof(rain_pct), "%u", (unsigned)data->rain_percent);
     (void)snprintf(rain_wet, sizeof(rain_wet), "%u", (unsigned)(data->rain_wet != 0U));
   }
-  int length = snprintf(buffer, capacity, "%lu,%s,%u,%s,%s,%s,%s,%s,%s,%s,%lu\r\n",
+  int length = snprintf(buffer, capacity, "%lu,%s,%u,%s,%s,%s,%s,%s,%s,%s,%lu,%s,%u\r\n",
       (unsigned long)sample_tick, timestamp, (unsigned)time_valid,
       temperature, humidity, pressure, light, rain_raw, rain_pct, rain_wet,
-      (unsigned long)data->valid_flags);
+      (unsigned long)data->valid_flags, WeatherStatus_Name(data->weather_status),
+      (unsigned)data->weather_reasons);
   return (length > 0 && (size_t)length < capacity) ? (size_t)length : 0U;
 }

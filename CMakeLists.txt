@@ -44,6 +44,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    Application/Src/weather_classification.c
     Application/Src/esp32_link.c
     Application/Src/sd_diagnostic.c
     Application/Src/sd_logger.c

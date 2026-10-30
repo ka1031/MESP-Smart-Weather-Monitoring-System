@@ -9,11 +9,12 @@
 - SSD1306 OLED: local readings and SD status
 - HW-125 microSD module: timestamped CSV logging
 - ESP32 DevKit V1: UART receiver and local Wi-Fi dashboard
+- STM32 weather classification: status and reasons in local/remote outputs
 
 ## Pending
 
 - Green/red status LEDs and buzzer, with assigned pins and driver circuit
-- Weather classification and alert handling
+- LED/buzzer alert handling
 - Internet connectivity, cloud history and remote alerts
 - Final enclosure, sensor mounting and system validation
 

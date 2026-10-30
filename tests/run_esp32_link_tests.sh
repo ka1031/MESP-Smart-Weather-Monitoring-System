@@ -17,7 +17,7 @@ for packet in packets:
     payload, checksum = packet[1:-2].rsplit(b'*', 1)
     assert len(checksum) == 4 and int(checksum, 16) == binascii.crc_hqx(payload, 0xffff)
     fields = next(csv.reader([payload.decode('ascii')]))
-    assert len(fields) == 14 and fields[:2] == ['MESP', '1']
+    assert len(fields) == 16 and fields[:2] == ['MESP', '2']
     assert 0 <= int(fields[2]) <= 0xffffffff and 0 <= int(fields[3]) <= 0xffffffff
 print('ESP32 UART: packets, independent CRC/CSV validation, bounds, missing data, failures and rollover passed')
 PY
